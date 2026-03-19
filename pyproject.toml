@@ -1,0 +1,43 @@
+[project]
+name = "oc-project8-mlops"
+version = "0.1.0"
+description = "Projet 8 OpenClassrooms - MLOps"
+authors = [{ name = "Justine Tranchant" }]
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "gradio (>=5.0,<6.0)",
+    "streamlit (>=1.40,<2.0)",
+    "mlflow (>=3.0,<4.0)",
+    "numpy (>=2.0,<3.0)",
+    "pandas (>=2.2,<3.0)",
+    "scikit-learn (>=1.5,<2.0)",
+    "joblib (>=1.4,<2.0)",
+    "python-dotenv (>=1.0,<2.0)",
+]
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.8"
+ipykernel = "^6.29"
+jupyter = "^1.1"
+pytest = "^8.3"
+ruff = "^0.6"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["poetry-core>=1.9.0"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.idea/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local artifacts
+tmp/
+logs/
