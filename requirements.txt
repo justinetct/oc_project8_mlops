@@ -1,6 +1,10 @@
-jupyter
+# Dépendances réservées aux contextes de build et de déploiement.
+# La source de vérité pour le développement local est pyproject.toml + poetry.lock.
+gradio
 joblib
 mlflow
 numpy
 pandas
 scikit-learn
+streamlit
+python-dotenv

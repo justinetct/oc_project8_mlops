@@ -1,5 +1,6 @@
 .DS_Store
 .env
+.idea/
 .venv/
 venv/
 __pycache__/
@@ -13,4 +14,3 @@ htmlcov/
 # Local artifacts
 tmp/
 logs/
-
