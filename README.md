@@ -8,20 +8,22 @@ Base de travail du projet 8.
 - `requirements.txt` : dépendances de build et de déploiement
 - `app_gradio/` : futur espace pour l'application de scoring
 - `dashboard_streamlit/` : futur espace pour le dashboard
-- `model/` : fichiers liés au modèle importé via MLflow
+- `model/` : modèle importé localement pour le projet 8
 - `notebooks/` : notebooks du projet
 - `scripts/` : scripts utilitaires
 - `tests/` : futurs tests
 
-## Import du modèle via MLflow
+## Modèle utilisé dans le projet 8
 
-Le dépôt prépare l'import du modèle via MLflow avec :
-- `model/imported_model/` pour recevoir l'artefact importé
-- `model/model_metadata.json` pour les métadonnées du modèle
-- `notebooks/00_import_model_mlflow.ipynb` pour documenter l'import
-- `scripts/import_model_mlflow.py` pour automatiser l'import ensuite
+Le modèle issu du projet 6 est importé dans un format local stable afin d’éviter une dépendance directe à MLflow au moment de l’exécution de l’application.
 
-Le contenu de ces fichiers est volontairement minimal a ce stade.
+Le dépôt contient :
+- `model/imported_model/` : artefact local du modèle
+- `model/model_metadata.json` : métadonnées minimales du modèle importé
+- `notebooks/00_import_model_mlflow.ipynb` : notebook de préparation de l’import
+- `scripts/import_model_mlflow.py` : script d’import du modèle
+
+Le notebook et le script d’import servent uniquement à préparer l’artefact local à partir du projet 6. Ils ne sont pas nécessaires pour exécuter l’application au quotidien une fois le modèle importé.
 
 ## Environnement local avec Poetry
 
@@ -43,6 +45,4 @@ poetry add <package>
 poetry add --group dev <package>
 ```
 
-`requirements.txt` est conservé pour les contextes de build et de déploiement
-(Docker, Hugging Face, CI/CD) et ne constitue pas la source principale de vérité
-de l’environnement local.
+`requirements.txt` est conservé pour les contextes de build et de déploiement (Docker, Hugging Face, CI/CD) et ne constitue pas la source principale de vérité de l’environnement local.

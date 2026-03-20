@@ -1,0 +1,21 @@
+flavors:
+  lightgbm:
+    code: null
+    data: model.pkl
+    lgb_version: 4.6.0
+    model_class: lightgbm.sklearn.LGBMClassifier
+    serialization_format: cloudpickle
+    skops_trusted_types: null
+  python_function:
+    data: model.pkl
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.lightgbm
+    python_version: 3.12.12
+mlflow_version: 3.9.0
+model_id: null
+model_size_bytes: 5238955
+model_uuid: 59abcba544db4334844a8780e8bda05d
+prompts: null
+utc_time_created: '2026-03-20 12:02:33.656443'

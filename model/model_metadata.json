@@ -1,6 +1,18 @@
 {
-  "model_name": "",
-  "model_version": "",
-  "mlflow_model_uri": "",
-  "import_date": ""
+  "imported_at_utc": "2026-03-20T16:29:23.924501+00:00",
+  "source": {
+    "tracking_uri": null,
+    "tracking_uri_source": "env"
+  },
+  "fallback": {
+    "source": {
+      "tracking_uri": null,
+      "tracking_uri_source": "hardcoded_metadata",
+      "model_uri": "mlflow-artifacts:/9/a7a30e9114c14acf9a3908650109c6bc/artifacts/model"
+    }
+  },
+  "local": {
+    "model_dir": "<PROJECT_ROOT>/model/imported_model",
+    "metadata_path": "<PROJECT_ROOT>/model/model_metadata.json"
+  }
 }
