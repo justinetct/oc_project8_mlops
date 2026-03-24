@@ -25,6 +25,20 @@ Le dépôt contient :
 
 Le notebook et le script d’import servent uniquement à préparer l’artefact local à partir du projet 6. Ils ne sont pas nécessaires pour exécuter l’application au quotidien une fois le modèle importé.
 
+## Chargement et prédiction
+
+Le modèle V5 (variante `V5_plus_married`, LightGBM) est chargé localement via `cloudpickle` depuis `model/imported_model/model.pkl`. Aucune dépendance à MLflow n’est requise au runtime.
+
+- `app_gradio/loader.py` : chargement unique du modèle (singleton module-level)
+- `app_gradio/predict.py` : logique de prédiction (recalcul des ratios + scoring)
+- `model/v5_ui_model_config.json` : config exportée du P6 (features, seuil, métriques)
+
+Le seuil de décision (`0.1`) est lu depuis la config du modèle.
+
+```bash
+poetry run pytest tests/test_predict.py -v
+```
+
 ## Environnement local avec Poetry
 
 Poetry gère l’environnement de développement local et les dépendances source du projet.

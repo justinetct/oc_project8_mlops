@@ -1,5 +1,5 @@
 {
-  "imported_at_utc": "2026-03-20T16:29:23.924501+00:00",
+  "imported_at_utc": "2026-03-24T08:25:54.740087+00:00",
   "source": {
     "tracking_uri": null,
     "tracking_uri_source": "env"
@@ -8,7 +8,7 @@
     "source": {
       "tracking_uri": null,
       "tracking_uri_source": "hardcoded_metadata",
-      "model_uri": "mlflow-artifacts:/9/a7a30e9114c14acf9a3908650109c6bc/artifacts/model"
+      "model_uri": "mlflow-artifacts:/9/56b9ca33984942c39ce1e723f20ec835/artifacts/model"
     }
   },
   "local": {

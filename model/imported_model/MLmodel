@@ -1,21 +1,25 @@
 flavors:
-  lightgbm:
-    code: null
-    data: model.pkl
-    lgb_version: 4.6.0
-    model_class: lightgbm.sklearn.LGBMClassifier
-    serialization_format: cloudpickle
-    skops_trusted_types: null
   python_function:
-    data: model.pkl
     env:
       conda: conda.yaml
       virtualenv: python_env.yaml
-    loader_module: mlflow.lightgbm
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
     python_version: 3.12.12
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: skops
+    sklearn_version: 1.8.0
+    skops_trusted_types:
+    - collections.OrderedDict
+    - lightgbm.basic.Booster
+    - lightgbm.sklearn.LGBMClassifier
+    - numpy.dtype
 mlflow_version: 3.9.0
 model_id: null
-model_size_bytes: 5238955
-model_uuid: 59abcba544db4334844a8780e8bda05d
+model_size_bytes: 5421066
+model_uuid: 004c33b706b744e4806831ecfa6dc3eb
 prompts: null
-utc_time_created: '2026-03-20 12:02:33.656443'
+utc_time_created: '2026-03-24 08:03:13.477713'

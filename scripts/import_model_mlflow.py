@@ -25,7 +25,7 @@ MODEL_METADATA_PATH = PATHS.model_metadata
 
 # Garde-fou : si MLFLOW_TRACKING_URI n'est pas défini dans l'environnement,
 # on n'essaie pas de contacter MLflow et on bascule sur des métadonnées codées en dur.
-HARD_CODED_MODEL_URI = "mlflow-artifacts:/9/a7a30e9114c14acf9a3908650109c6bc/artifacts/model"
+HARD_CODED_MODEL_URI = "mlflow-artifacts:/9/56b9ca33984942c39ce1e723f20ec835/artifacts/model"
 
 HARD_CODED_MODEL_METADATA = {
     "source": {
@@ -97,6 +97,22 @@ def verify_local_reload(local_model_path: Path):
     return mlflow.pyfunc.load_model(model_uri=str(local_model_path.resolve()))
 
 
+def export_simple_model(local_model_path: Path) -> Path:
+    """Re-sauvegarde le modèle en joblib pour un chargement sans MLflow.
+
+    Charge l'artefact MLflow, extrait le modèle sklearn sous-jacent,
+    et le sauvegarde en format joblib simple.
+    """
+    import joblib
+
+    pyfunc_model = mlflow.pyfunc.load_model(model_uri=str(local_model_path.resolve()))
+    raw_model = pyfunc_model.get_raw_model()
+
+    output_path = local_model_path.parent / "model_simple.joblib"
+    joblib.dump(raw_model, output_path)
+    return output_path
+
+
 def import_model() -> dict[str, Any]:
     """Import the MLflow model into the local project tree."""
     load_dotenv(override=False)
@@ -137,6 +153,9 @@ def import_model() -> dict[str, Any]:
     save_metadata(metadata, MODEL_METADATA_PATH)
 
     _ = verify_local_reload(MODEL_DIR)
+
+    simple_path = export_simple_model(MODEL_DIR)
+    print(f"Modèle simplifié exporté dans : {mask_path(simple_path)}")
 
     print("Connexion MLflow configurée : OK")
     print(f"Source de configuration MLflow : {tracking_uri_source}")

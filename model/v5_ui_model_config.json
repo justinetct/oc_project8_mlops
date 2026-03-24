@@ -1,0 +1,60 @@
+{
+  "model_name": "LGBM_V5_UI",
+  "variant": "V5_plus_married",
+  "features": [
+    "EXT_SOURCE_1",
+    "EXT_SOURCE_2",
+    "EXT_SOURCE_3",
+    "DAYS_BIRTH",
+    "DAYS_EMPLOYED",
+    "DAYS_ID_PUBLISH",
+    "AMT_ANNUITY",
+    "AMT_GOODS_PRICE",
+    "AMT_CREDIT",
+    "AMT_INCOME_TOTAL",
+    "RATIO_CREDIT_ANNUITY",
+    "RATIO_GOODS_CREDIT",
+    "RATIO_ANNUITY_INCOME",
+    "NAME_FAMILY_STATUS_is_MARRIED"
+  ],
+  "n_features": 14,
+  "params": {
+    "n_estimators": 5102,
+    "learning_rate": 0.01939618651115162,
+    "max_depth": 3,
+    "num_leaves": 19,
+    "min_child_samples": 190,
+    "min_child_weight": 0.001515642164817086,
+    "min_split_gain": 0.013659457630816694,
+    "subsample": 0.6875155175699468,
+    "colsample_bytree": 0.420883158231223,
+    "reg_alpha": 3.294193171521474,
+    "reg_lambda": 3.5858241694193596,
+    "max_bin": 128,
+    "objective": "binary",
+    "random_state": 42,
+    "n_jobs": 6,
+    "verbosity": -1,
+    "force_row_wise": true
+  },
+  "source": "hyperparam\u00e8tres h\u00e9rit\u00e9s du mod\u00e8le final P6 (LGBM_tuned_refined)",
+  "mlflow": {
+    "experiment_name": "oc_p6_homecredit",
+    "experiment_id": "9",
+    "run_id": "56b9ca33984942c39ce1e723f20ec835",
+    "registered_model_name": "LGBM_V5_UI"
+  },
+  "metrics": {
+    "roc_auc_cv_mean": 0.7605221866523987,
+    "roc_auc_cv_std": 0.001760927490626299,
+    "roc_auc_train_mean": 0.7852086145524618,
+    "roc_auc_holdout": 0.7608286055309198,
+    "overfit_gap_auc": 0.024686427900063146,
+    "business_cost_cv_mean": 54206.666666666664,
+    "business_cost_holdout_best": 32815.0,
+    "business_cost_holdout_t05": 48552.0,
+    "best_threshold_holdout": 0.1,
+    "recall_pos_holdout": 0.5969788519637462,
+    "f1_pos_holdout": 0.28590720555609145
+  }
+}
