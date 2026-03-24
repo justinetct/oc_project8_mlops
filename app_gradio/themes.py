@@ -44,6 +44,17 @@ CSS = """
 .gradio-container {
     max-width: 1100px !important;
 }
+/* Force le tableau d'exemples en dark mode */
+.gradio-container table,
+.gradio-container table th,
+.gradio-container table td {
+    background-color: #1C2030 !important;
+    color: #E6E8ED !important;
+    border-color: #272C3A !important;
+}
+.gradio-container .gr-samples-table tr:hover td {
+    background-color: #272C3A !important;
+}
 """
 
 # -- Thème Gradio -----------------------------------------------------------

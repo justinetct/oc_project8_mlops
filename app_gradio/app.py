@@ -115,8 +115,11 @@ EXAMPLES = [
 # ---------------------------------------------------------------------------
 def build_app() -> gr.Blocks:
     """Construit l'application Gradio."""
+    # js: force le dark mode au chargement (évite le flash blanc)
+    force_dark = "() => { document.body.classList.add('dark'); }"
+
     with gr.Blocks(title="Prêt à Dépenser — Scoring Crédit",
-                    theme=THEME, css=CSS) as app:
+                    theme=THEME, css=CSS, js=force_dark) as app:
         gr.HTML(_logo_html())
 
         with gr.Row():
