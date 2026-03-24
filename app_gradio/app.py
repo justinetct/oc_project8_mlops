@@ -9,11 +9,13 @@ par rapport à la date de référence du challenge Kaggle Home Credit (2018-05-1
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime
 
 import gradio as gr
 
 from app_gradio.predict import predict
+from app_gradio.themes import CSS, LOGO_PATH, THEME
 from src.config import HOME_CREDIT_REFERENCE_DATE
 
 
@@ -27,6 +29,17 @@ def _date_str_to_days(date_str: str) -> int:
     """
     d = datetime.strptime(date_str, "%Y-%m-%d").date()
     return (d - HOME_CREDIT_REFERENCE_DATE).days
+
+
+def _logo_html() -> str:
+    """Génère le HTML pour afficher le logo SVG inline."""
+    svg_bytes = LOGO_PATH.read_bytes()
+    b64 = base64.b64encode(svg_bytes).decode()
+    return (
+        '<div class="logo-container">'
+        f'<img src="data:image/svg+xml;base64,{b64}" alt="Prêt à Dépenser">'
+        "</div>"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -65,12 +78,19 @@ def gradio_predict(
     score = result["score"]
     label = result["label"]
     threshold = result["threshold"]
+    granted = label == "Crédit accordé"
+
+    css_class = "result-granted" if granted else "result-refused"
+    emoji = "✅" if granted else "❌"
 
     return (
-        f"## {label}\n\n"
-        f"- **Score de risque** : {score:.4f}\n"
-        f"- **Seuil de décision** : {threshold}\n\n"
-        f"*Un score inférieur au seuil signifie que le crédit est accordé.*"
+        f'<div class="result-box {css_class}">\n\n'
+        f"## {emoji} {label}\n\n"
+        f"| | |\n|---|---|\n"
+        f"| **Score de risque** | {score:.4f} |\n"
+        f"| **Seuil de décision** | {threshold} |\n\n"
+        f"*Un score inférieur au seuil = crédit accordé.*\n"
+        f"</div>"
     )
 
 
@@ -94,8 +114,10 @@ EXAMPLES = [
 # Construction de l'interface
 # ---------------------------------------------------------------------------
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="Scoring Crédit - Projet 8") as app:
-        gr.Markdown("# Scoring Crédit\nSaisissez le profil client pour obtenir la décision.")
+    """Construit l'application Gradio."""
+    with gr.Blocks(title="Prêt à Dépenser — Scoring Crédit",
+                    theme=THEME, css=CSS) as app:
+        gr.HTML(_logo_html())
 
         with gr.Row():
             with gr.Column():
