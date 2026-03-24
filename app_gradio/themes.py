@@ -28,18 +28,81 @@ CSS = """
 .logo-container img {
     height: 64px;
 }
-.result-box {
-    padding: 20px;
-    border-radius: 8px;
+/* -- Carte de résultat -- */
+.result-card {
+    background: #1C2030;
+    border-radius: 10px;
+    padding: 24px 28px;
     margin-top: 12px;
 }
-.result-granted {
-    background: #1C2030;
-    border-left: 4px solid #5CB85C;
+.result-card.granted { border-left: 5px solid #5CB85C; }
+.result-card.refused  { border-left: 5px solid #D9534F; }
+
+.result-decision {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 16px 0;
+    line-height: 1.3;
 }
-.result-refused {
-    background: #1C2030;
-    border-left: 4px solid #D9534F;
+.result-card.granted .result-decision { color: #5CB85C; }
+.result-card.refused .result-decision  { color: #D9534F; }
+
+/* Barre de risque */
+.risk-bar-container {
+    margin: 16px 0;
+}
+.risk-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #8B92A5;
+    margin-bottom: 6px;
+}
+.risk-bar-track {
+    position: relative;
+    height: 8px;
+    background: #272C3A;
+    border-radius: 4px;
+    overflow: visible;
+}
+.risk-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+.risk-bar-fill.low    { background: linear-gradient(90deg, #5CB85C, #8BD18B); }
+.risk-bar-fill.medium { background: linear-gradient(90deg, #D4A843, #E6C06B); }
+.risk-bar-fill.high   { background: linear-gradient(90deg, #D9534F, #E88480); }
+
+.risk-score-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #E6E8ED;
+    margin-right: 6px;
+}
+.risk-score-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.risk-score-label {
+    font-size: 0.85rem;
+    color: #8B92A5;
+}
+
+.result-message {
+    font-size: 0.95rem;
+    color: #C8CCD6;
+    margin: 14px 0 0 0;
+    line-height: 1.5;
+}
+.result-technical {
+    font-size: 0.75rem;
+    color: #4B5060;
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid #272C3A;
 }
 .gradio-container {
     max-width: 1100px !important;

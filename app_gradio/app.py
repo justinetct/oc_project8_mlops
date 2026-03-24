@@ -80,18 +80,44 @@ def gradio_predict(
     threshold = result["threshold"]
     granted = label == "Crédit accordé"
 
-    css_class = "result-granted" if granted else "result-refused"
+    # Niveau de risque pour la barre
+    pct = min(score * 100 / 0.5, 100)  # normalisé sur 0–50% pour lisibilité
+    if score < threshold:
+        bar_class = "low"
+    elif score < 0.3:
+        bar_class = "medium"
+    else:
+        bar_class = "high"
+
+    status = "granted" if granted else "refused"
     emoji = "✅" if granted else "❌"
 
-    return (
-        f'<div class="result-box {css_class}">\n\n'
-        f"## {emoji} {label}\n\n"
-        f"| | |\n|---|---|\n"
-        f"| **Score de risque** | {score:.4f} |\n"
-        f"| **Seuil de décision** | {threshold} |\n\n"
-        f"*Un score inférieur au seuil = crédit accordé.*\n"
-        f"</div>"
-    )
+    if granted:
+        message = "Le profil présente un risque faible. La demande est acceptée selon le modèle."
+    else:
+        message = (
+            "Le profil présente un risque supérieur au niveau accepté. "
+            "La demande est refusée selon le modèle."
+        )
+
+    return f"""<div class="result-card {status}">
+  <p class="result-decision">{emoji} {label}</p>
+  <div class="risk-score-row">
+    <span class="risk-score-value">{score:.2%}</span>
+    <span class="risk-score-label">score de risque</span>
+  </div>
+  <div class="risk-bar-container">
+    <div class="risk-bar-track">
+      <div class="risk-bar-fill {bar_class}" style="width:{pct:.0f}%"></div>
+    </div>
+    <div class="risk-bar-label">
+      <span>Faible</span>
+      <span>Élevé</span>
+    </div>
+  </div>
+  <p class="result-message">{message}</p>
+  <p class="result-technical">Détail technique : score {score:.4f} — seuil {threshold}</p>
+</div>"""
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +180,7 @@ def build_app() -> gr.Blocks:
 
                 gr.Markdown("---")
                 btn = gr.Button("Prédire", variant="primary")
-                output = gr.Markdown(label="Résultat")
+                output = gr.Markdown(sanitize_html=False)
 
         all_inputs = [
             ext1, ext2, ext3,
