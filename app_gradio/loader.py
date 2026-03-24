@@ -25,7 +25,9 @@ def _load_model():
             f"Modèle introuvable : {MODEL_JOBLIB_PATH}. "
             "Lance d'abord le script d'import MLflow."
         )
-    return joblib.load(MODEL_JOBLIB_PATH)
+    pipeline = joblib.load(MODEL_JOBLIB_PATH)
+    pipeline.set_output(transform="pandas")
+    return pipeline
 
 
 def _load_config() -> dict:
