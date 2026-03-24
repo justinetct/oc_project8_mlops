@@ -80,43 +80,39 @@ def gradio_predict(
     threshold = result["threshold"]
     granted = label == "Crédit accordé"
 
-    # Niveau de risque pour la barre
-    pct = min(score * 100 / 0.5, 100)  # normalisé sur 0–50% pour lisibilité
-    if score < threshold:
-        bar_class = "low"
-    elif score < 0.3:
-        bar_class = "medium"
-    else:
-        bar_class = "high"
+    # Position du score et du seuil sur la jauge (normalisés sur 0–50%)
+    score_pct = min(score / 0.5 * 100, 100)
+    threshold_pct = threshold / 0.5 * 100
 
     status = "granted" if granted else "refused"
     emoji = "✅" if granted else "❌"
+    level_label = "Sous le seuil accepté" if granted else "Au-dessus du seuil accepté"
 
     if granted:
-        message = "Le profil présente un risque faible. La demande est acceptée selon le modèle."
+        message = "Le profil présente un risque acceptable. La demande est acceptée."
+    elif score < 0.3:
+        message = "Le risque dépasse le seuil autorisé. La demande est refusée."
     else:
-        message = (
-            "Le profil présente un risque supérieur au niveau accepté. "
-            "La demande est refusée selon le modèle."
-        )
+        message = "Le profil présente un risque élevé. La demande est refusée."
 
     return f"""<div class="result-card {status}">
   <p class="result-decision">{emoji} {label}</p>
-  <div class="risk-score-row">
-    <span class="risk-score-value">{score:.2%}</span>
-    <span class="risk-score-label">score de risque</span>
-  </div>
-  <div class="risk-bar-container">
-    <div class="risk-bar-track">
-      <div class="risk-bar-fill {bar_class}" style="width:{pct:.0f}%"></div>
+  <p class="risk-title">Risque</p>
+  <div class="risk-gauge">
+    <div class="risk-gauge-track">
+      <div class="risk-gauge-fill {status}" style="width:{score_pct:.0f}%"></div>
+      <div class="risk-gauge-threshold" style="left:{threshold_pct:.0f}%">
+        <div class="threshold-line"></div>
+        <span class="threshold-label">seuil</span>
+      </div>
     </div>
-    <div class="risk-bar-label">
+    <div class="risk-gauge-labels">
       <span>Faible</span>
       <span>Élevé</span>
     </div>
   </div>
+  <p class="risk-level {status}">{level_label}</p>
   <p class="result-message">{message}</p>
-  <p class="result-technical">Détail technique : score {score:.4f} — seuil {threshold}</p>
 </div>"""
 
 

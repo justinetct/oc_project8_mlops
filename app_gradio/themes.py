@@ -36,73 +36,85 @@ CSS = """
     margin-top: 12px;
 }
 .result-card.granted { border-left: 5px solid #5CB85C; }
-.result-card.refused  { border-left: 5px solid #D9534F; }
+.result-card.refused { border-left: 5px solid #D9534F; }
 
 .result-decision {
     font-size: 1.5rem;
     font-weight: 700;
-    margin: 0 0 16px 0;
-    line-height: 1.3;
+    margin: 0 0 18px 0;
 }
 .result-card.granted .result-decision { color: #5CB85C; }
-.result-card.refused .result-decision  { color: #D9534F; }
+.result-card.refused .result-decision { color: #D9534F; }
 
-/* Barre de risque */
-.risk-bar-container {
-    margin: 16px 0;
-}
-.risk-bar-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.8rem;
+.risk-title {
+    font-size: 0.85rem;
+    font-weight: 600;
     color: #8B92A5;
-    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 8px 0;
 }
-.risk-bar-track {
+
+/* Jauge de risque */
+.risk-gauge { margin: 0 0 14px 0; }
+.risk-gauge-track {
     position: relative;
-    height: 8px;
+    height: 10px;
     background: #272C3A;
-    border-radius: 4px;
-    overflow: visible;
+    border-radius: 5px;
 }
-.risk-bar-fill {
+.risk-gauge-fill {
     height: 100%;
-    border-radius: 4px;
+    border-radius: 5px;
     transition: width 0.3s ease;
 }
-.risk-bar-fill.low    { background: linear-gradient(90deg, #5CB85C, #8BD18B); }
-.risk-bar-fill.medium { background: linear-gradient(90deg, #D4A843, #E6C06B); }
-.risk-bar-fill.high   { background: linear-gradient(90deg, #D9534F, #E88480); }
+.risk-gauge-fill.granted { background: linear-gradient(90deg, #3a7a3a, #5CB85C); }
+.risk-gauge-fill.refused { background: linear-gradient(90deg, #D4A843, #D9534F); }
 
-.risk-score-value {
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: #E6E8ED;
-    margin-right: 6px;
-}
-.risk-score-row {
+/* Marqueur de seuil */
+.risk-gauge-threshold {
+    position: absolute;
+    top: -6px;
+    transform: translateX(-50%);
     display: flex;
-    align-items: baseline;
-    gap: 8px;
-    margin-bottom: 4px;
+    flex-direction: column;
+    align-items: center;
 }
-.risk-score-label {
-    font-size: 0.85rem;
+.threshold-line {
+    width: 2px;
+    height: 22px;
+    background: #E6E8ED;
+    border-radius: 1px;
+}
+.threshold-label {
+    font-size: 0.65rem;
     color: #8B92A5;
+    margin-top: 2px;
+    white-space: nowrap;
 }
 
-.result-message {
-    font-size: 0.95rem;
-    color: #C8CCD6;
-    margin: 14px 0 0 0;
-    line-height: 1.5;
-}
-.result-technical {
+.risk-gauge-labels {
+    display: flex;
+    justify-content: space-between;
     font-size: 0.75rem;
     color: #4B5060;
-    margin-top: 14px;
-    padding-top: 10px;
-    border-top: 1px solid #272C3A;
+    margin-top: 4px;
+}
+
+/* Libellé de niveau */
+.risk-level {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+}
+.risk-level.granted { color: #5CB85C; }
+.risk-level.refused { color: #D9534F; }
+
+.result-message {
+    font-size: 0.9rem;
+    color: #8B92A5;
+    margin: 0;
+    line-height: 1.5;
 }
 .gradio-container {
     max-width: 1100px !important;

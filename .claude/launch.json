@@ -6,6 +6,12 @@
       "runtimeExecutable": "poetry",
       "runtimeArgs": ["run", "python", "-m", "app_gradio.app"],
       "port": 7860
+    },
+    {
+      "name": "results-preview",
+      "runtimeExecutable": "poetry",
+      "runtimeArgs": ["run", "python", "-m", "app_gradio.preview_results"],
+      "port": 7861
     }
   ]
 }
