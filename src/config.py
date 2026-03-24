@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -11,6 +12,10 @@ load_dotenv()
 
 PROJECT_NAME = "OC-P8-MLOps"
 SEED = 42
+
+# Date de lancement du challenge Kaggle Home Credit Default Risk.
+# Sert de référence pour convertir les dates saisies en DAYS_*.
+HOME_CREDIT_REFERENCE_DATE = date(2018, 5, 17)
 
 MODEL_ARTIFACT_DIRNAME = "imported_model"
 MODEL_METADATA_FILENAME = "model_metadata.json"
