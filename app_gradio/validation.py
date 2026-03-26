@@ -34,7 +34,7 @@ def validate(
     _check_positive(amt_income_total, "Le revenu total", errors)
 
     # -- Cohérence montants --
-    if amt_credit > 0 and amt_goods_price > 0 and amt_credit > amt_goods_price:
+    if (amt_credit or 0) > 0 and (amt_goods_price or 0) > 0 and amt_credit > amt_goods_price:
         errors.append(
             "Le montant du crédit ne peut pas dépasser le prix du bien."
         )

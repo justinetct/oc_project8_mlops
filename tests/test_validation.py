@@ -159,6 +159,23 @@ def test_employment_after_birth_is_valid():
 
 
 # -------------------------------------------------------------------
+# Types incorrects (None passé à la place d'un nombre)
+# -------------------------------------------------------------------
+@pytest.mark.parametrize("field", [
+    "amt_annuity", "amt_goods_price", "amt_credit", "amt_income_total",
+])
+def test_none_amount_rejected(field):
+    errors = _validate_with(**{field: None})
+    assert len(errors) >= 1
+    assert any("supérieur à zéro" in e for e in errors)
+
+
+def test_none_date_rejected():
+    errors = _validate_with(date_naissance=None)
+    assert any("obligatoire" in e for e in errors)
+
+
+# -------------------------------------------------------------------
 # Cumul de plusieurs erreurs
 # -------------------------------------------------------------------
 def test_multiple_errors_at_once():
