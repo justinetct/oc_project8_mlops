@@ -131,6 +131,13 @@ def test_almost_18_rejected():
     assert any("18 ans" in e for e in errors)
 
 
+def test_born_feb_29_leap_year():
+    # Né le 29/02/2000 → 18 ans le 01/03/2018 (2018 pas bissextile)
+    # La référence est le 17/05/2018, donc 18 ans est atteint → OK
+    errors = _validate_with(date_naissance="2000-02-29")
+    assert not any("18 ans" in e for e in errors)
+
+
 # -------------------------------------------------------------------
 # Dates : cohérence emploi / identité par rapport à naissance
 # -------------------------------------------------------------------

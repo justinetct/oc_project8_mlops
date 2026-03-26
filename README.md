@@ -2,65 +2,99 @@
   <img src="app_gradio/assets/logo_m3_gold.svg" alt="Prêt à Dépenser" width="300">
 </p>
 
-# Projet 8 OpenClassrooms - MLOps
+# Prêt à Dépenser — Scoring Crédit
 
-Base de travail du projet 8.
+Projet 8 OpenClassrooms — Parcours Data Scientist.
 
-## Structure actuelle
+Application de scoring crédit permettant d’estimer le risque d’un dossier et d’afficher une décision d’accord ou de refus.
 
-- `pyproject.toml` / `poetry.lock` : source de vérité pour l’environnement local
-- `requirements.txt` : dépendances de build et de déploiement
-- `app_gradio/` : futur espace pour l'application de scoring
-- `dashboard_streamlit/` : futur espace pour le dashboard
-- `model/` : modèle importé localement pour le projet 8
-- `notebooks/` : notebooks du projet
-- `scripts/` : scripts utilitaires
-- `tests/` : futurs tests
+## Fonctionnalités
 
-## Modèle utilisé dans le projet 8
+- Interface Gradio avec saisie du profil client (dates, montants, scores externes)
+- Validation des entrées avec messages d'erreur explicites
+- Prédiction locale via un modèle LightGBM (pas de dépendance MLflow au runtime)
+- Carte de résultat avec jauge de risque et décision lisible
+- 3 exemples de profils pré-enregistrés pour la démo
 
-Le modèle issu du projet 6 est importé dans un format local stable afin d’éviter une dépendance directe à MLflow au moment de l’exécution de l’application.
-
-Le dépôt contient :
-- `model/imported_model/` : artefact local du modèle
-- `model/model_metadata.json` : métadonnées minimales du modèle importé
-- `notebooks/00_import_model_mlflow.ipynb` : notebook de préparation de l’import
-- `scripts/import_model_mlflow.py` : script d’import du modèle
-
-Le notebook et le script d’import servent uniquement à préparer l’artefact local à partir du projet 6. Ils ne sont pas nécessaires pour exécuter l’application au quotidien une fois le modèle importé.
-
-## Chargement et prédiction
-
-Le modèle V5 (variante `V5_plus_married`, LightGBM) est chargé localement via `cloudpickle` depuis `model/imported_model/model.pkl`. Aucune dépendance à MLflow n’est requise au runtime.
-
-- `app_gradio/loader.py` : chargement unique du modèle (singleton module-level)
-- `app_gradio/predict.py` : logique de prédiction (recalcul des ratios + scoring)
-- `model/v5_ui_model_config.json` : config exportée du P6 (features, seuil, métriques)
-
-Le seuil de décision (`0.1`) est lu depuis la config du modèle.
+## Lancer l'application
 
 ```bash
-poetry run pytest tests/test_predict.py -v
+poetry install
+poetry run python -m app_gradio.app
 ```
 
-## Environnement local avec Poetry
+L'application s'ouvre sur `http://localhost:7860`.
 
-Poetry gère l’environnement de développement local et les dépendances source du projet.
+## Lancer les tests
 
-Commandes utiles :
+```bash
+# Tous les tests
+poetry run pytest tests/ -v
+
+# Avec couverture (terminal)
+poetry run pytest tests/ --cov=app_gradio --cov-report=term-missing
+
+# Rapport de couverture HTML
+poetry run pytest tests/ --cov=app_gradio --cov-report=html
+```
+
+54 tests couvrant :
+- **Prédiction** : chargement du modèle, format de sortie, score, label — 7 tests (`test_predict.py`)
+- **Validation** : montants, dates, cohérence métier, types incorrects, edge cases — 30 tests (`test_validation.py`)
+- **Intégration** : chaîne complète UI → validation → prédiction, helpers, construction de l'app — 17 tests (`test_integration.py`)
+
+## Structure du projet
+
+```
+├── app_gradio/
+│   ├── app.py              # Application Gradio (interface + logique UI)
+│   ├── predict.py           # Fonction de prédiction (ratios + scoring)
+│   ├── validation.py        # Validation des entrées utilisateur
+│   ├── loader.py            # Chargement unique du modèle (singleton)
+│   ├── themes.py            # Thème Navy Gold + CSS
+│   └── assets/              # Logo SVG, favicon
+├── model/
+│   ├── model_simple.joblib          # Modèle LightGBM local
+│   └── v5_ui_model_config.json      # Config (features, seuil, métriques)
+├── notebooks/
+│   └── 00_import_model_mlflow.ipynb  # Import du modèle depuis P6
+├── scripts/
+│   └── import_model_mlflow.py        # Script d'import MLflow
+├── src/
+│   └── config.py            # Configuration centralisée (chemins, constantes)
+├── tests/
+│   ├── test_predict.py      # 7 tests — prédiction
+│   ├── test_validation.py   # 30 tests — validation des entrées
+│   └── test_integration.py  # 17 tests — intégration et helpers
+└── pyproject.toml           # Dépendances Poetry
+```
+
+## Modèle
+
+| Propriété           | Valeur |
+|---------------------|---|
+| Type                | Modèle LightGBM allégé |
+| Origine             | Version simplifiée du modèle développé au projet 6 |
+| Features            | 14 (11 saisies + 3 ratios calculés) |
+| Seuil de décision   | 0.1 |
+| Performance holdout | AUC = 0.761 |
+
+Le modèle allégé est chargé une seule fois au démarrage depuis model/model_simple.joblib. L’application fonctionne localement, sans dépendance à MLflow au runtime.
+## Règles de validation
+
+| Règle | Détail |
+|---|---|
+| Montants | Strictement positifs |
+| Crédit vs prix du bien | Crédit ≤ prix du bien |
+| Dates | Format AAAA-MM-JJ, entre 1900 et la date de référence |
+| Âge minimum | 18 ans à la date de référence (2018-05-17) |
+| Cohérence dates | Emploi et document d'identité postérieurs à la naissance |
+
+## Environnement
 
 ```bash
 poetry env use python3.12
 poetry install
-poetry run python scripts/import_model_mlflow.py
-poetry run jupyter notebook
 ```
 
-Ajout de dépendances :
-
-```bash
-poetry add <package>
-poetry add --group dev <package>
-```
-
-`requirements.txt` est conservé pour les contextes de build et de déploiement (Docker, Hugging Face, CI/CD) et ne constitue pas la source principale de vérité de l’environnement local.
+Python 3.12 requis. Poetry gère l'environnement de développement local.

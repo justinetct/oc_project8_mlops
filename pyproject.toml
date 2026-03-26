@@ -42,6 +42,10 @@ target-version = "py312"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning:websockets",
+    "ignore::DeprecationWarning:gradio",
+]
 
 [build-system]
 requires = ["poetry-core>=1.9.0"]
