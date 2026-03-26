@@ -15,7 +15,8 @@ from datetime import datetime
 import gradio as gr
 
 from app_gradio.predict import predict
-from app_gradio.themes import CSS, LOGO_PATH, THEME
+from app_gradio.themes import CSS, FAVICON_PATH, LOGO_PATH, THEME
+from app_gradio.validation import validate
 from src.config import HOME_CREDIT_REFERENCE_DATE
 
 
@@ -42,8 +43,19 @@ def _logo_html() -> str:
     )
 
 
+def _error_html(errors: list[str]) -> str:
+    """Génère le HTML pour afficher les erreurs de validation."""
+    items = "".join(f"<li>{e}</li>" for e in errors)
+    return (
+        '<div class="result-card error">'
+        '<p class="result-decision">⚠\ufe0f Saisie invalide</p>'
+        f'<ul class="error-list">{items}</ul>'
+        "</div>"
+    )
+
+
 # ---------------------------------------------------------------------------
-# Pont Gradio -> predict()
+# Pont Gradio -> validate() -> predict()
 # ---------------------------------------------------------------------------
 def gradio_predict(
     ext_source_1: float,
@@ -59,6 +71,20 @@ def gradio_predict(
     is_married: str,
 ) -> str:
     """Reçoit les champs UI lisibles et appelle predict() avec les features techniques."""
+    # -- Validation --
+    errors = validate(
+        date_naissance=date_naissance,
+        date_embauche=date_embauche,
+        date_id=date_id,
+        amt_annuity=amt_annuity,
+        amt_goods_price=amt_goods_price,
+        amt_credit=amt_credit,
+        amt_income_total=amt_income_total,
+    )
+    if errors:
+        return _error_html(errors)
+
+    # -- Construction du dictionnaire technique --
     user_input = {
         "EXT_SOURCE_1": ext_source_1,
         "EXT_SOURCE_2": ext_source_2,
@@ -122,13 +148,13 @@ def gradio_predict(
 EXAMPLES = [
     # Profil 1 : senior stable, faible risque
     [0.62, 0.71, 0.51, "1975-03-15", "2010-01-10", "2015-06-20",
-     20_000, 250_000, 270_000, 250_000, "Oui"],
+     20_000, 250_000, 230_000, 250_000, "Oui"],
     # Profil 2 : jeune, emploi récent, risque élevé
     [0.10, 0.18, 0.12, "1992-08-20", "2017-11-01", "2016-03-10",
-     40_000, 500_000, 550_000, 120_000, "Non"],
+     40_000, 500_000, 480_000, 120_000, "Non"],
     # Profil 3 : profil intermédiaire
     [0.40, 0.42, 0.30, "1985-06-10", "2015-09-01", "2013-01-15",
-     30_000, 350_000, 400_000, 180_000, "Oui"],
+     30_000, 350_000, 330_000, 180_000, "Oui"],
 ]
 
 
@@ -137,42 +163,61 @@ EXAMPLES = [
 # ---------------------------------------------------------------------------
 def build_app() -> gr.Blocks:
     """Construit l'application Gradio."""
-    # js: force le dark mode au chargement (évite le flash blanc)
-    force_dark = "() => { document.body.classList.add('dark'); }"
+    # JS : force dark mode + désactive le bouton si un champ est vide
+    init_js = """() => {
+        document.body.classList.add('dark');
+        function checkFields() {
+            const btn = document.querySelector('button.primary');
+            if (!btn) return;
+            const texts = document.querySelectorAll('textarea, input[type="text"]');
+            const numbers = document.querySelectorAll('input[type="number"]');
+            let empty = false;
+            texts.forEach(el => { if (!el.value.trim()) empty = true; });
+            numbers.forEach(el => { if (el.value === '') empty = true; });
+            btn.disabled = empty;
+        }
+        const obs = new MutationObserver(checkFields);
+        obs.observe(document.body, {childList: true, subtree: true});
+        document.body.addEventListener('input', checkFields);
+        setTimeout(checkFields, 500);
+    }"""
 
     with gr.Blocks(title="Prêt à Dépenser — Scoring Crédit",
-                    theme=THEME, css=CSS, js=force_dark) as app:
+                    theme=THEME, css=CSS, js=init_js) as app:
         gr.HTML(_logo_html())
+
+        # Valeurs par défaut = premier exemple (profil senior stable)
+        ex = EXAMPLES[0]
 
         with gr.Row():
             with gr.Column():
                 gr.Markdown("### Sources externes")
-                ext1 = gr.Slider(0, 1, value=0.5, step=0.01,
+                ext1 = gr.Slider(0, 1, value=ex[0], step=0.01,
                                  label="Score source externe 1")
-                ext2 = gr.Slider(0, 1, value=0.5, step=0.01,
+                ext2 = gr.Slider(0, 1, value=ex[1], step=0.01,
                                  label="Score source externe 2")
-                ext3 = gr.Slider(0, 1, value=0.5, step=0.01,
+                ext3 = gr.Slider(0, 1, value=ex[2], step=0.01,
                                  label="Score source externe 3")
 
                 gr.Markdown("### Informations personnelles")
-                date_birth = gr.Textbox(value="1985-06-10",
+                date_birth = gr.Textbox(value=ex[3],
                                         label="Date de naissance",
                                         info="Format AAAA-MM-JJ")
-                date_employed = gr.Textbox(value="2015-09-01",
+                date_employed = gr.Textbox(value=ex[4],
                                            label="Date de début d'emploi",
                                            info="Format AAAA-MM-JJ")
-                date_id = gr.Textbox(value="2013-01-15",
+                date_id = gr.Textbox(value=ex[5],
                                      label="Date de mise à jour du document d'identité",
                                      info="Format AAAA-MM-JJ")
-                married = gr.Radio(["Oui", "Non"], value="Oui",
+                married = gr.Radio(["Oui", "Non"], value=ex[10],
                                    label="Marié(e)")
 
             with gr.Column():
                 gr.Markdown("### Montants financiers")
-                annuity = gr.Number(value=25_000, label="Annuité")
-                goods = gr.Number(value=300_000, label="Prix du bien")
-                credit = gr.Number(value=350_000, label="Montant du crédit")
-                income = gr.Number(value=200_000, label="Revenu total")
+                annuity = gr.Number(value=ex[6], label="Échéance annuelle")
+                goods = gr.Number(value=ex[7], label="Prix du bien")
+                credit = gr.Number(value=ex[8], label="Montant du crédit")
+                income = gr.Number(value=ex[9], label="Revenu total")
 
                 gr.Markdown("---")
                 btn = gr.Button("Prédire", variant="primary")
@@ -201,4 +246,4 @@ def build_app() -> gr.Blocks:
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     demo = build_app()
-    demo.launch()
+    demo.launch(favicon_path=str(FAVICON_PATH))

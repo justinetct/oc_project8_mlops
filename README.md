@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app_gradio/assets/logo_m3_gold.svg" alt="Prêt à Dépenser" width="300">
+</p>
+
 # Projet 8 OpenClassrooms - MLOps
 
 Base de travail du projet 8.

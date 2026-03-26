@@ -12,8 +12,9 @@ import gradio as gr
 
 ASSETS_DIR = Path(__file__).parent / "assets"
 
-# -- Logo -------------------------------------------------------------------
+# -- Logo / Favicon ---------------------------------------------------------
 LOGO_PATH = ASSETS_DIR / "logo_m3_gold.svg"
+FAVICON_PATH = ASSETS_DIR / "favicon.svg"
 
 # -- Couleurs de résultat ---------------------------------------------------
 COLOR_GRANTED = "#5CB85C"
@@ -115,6 +116,44 @@ CSS = """
     color: #8B92A5;
     margin: 0;
     line-height: 1.5;
+}
+/* Carte d'erreur de validation */
+.result-card.error { border-left: 5px solid #D4A843; }
+.result-card.error .result-decision {
+    color: #D4A843;
+    font-size: 1.3rem;
+}
+.error-list {
+    margin: 10px 0 0 0;
+    padding-left: 20px;
+    color: #E6E8ED;
+    line-height: 1.8;
+    font-size: 0.9rem;
+}
+.error-list li { margin-bottom: 2px; }
+/* -- Bordures visibles sur les champs de saisie -- */
+.gradio-container input[type="text"],
+.gradio-container input[type="number"],
+.gradio-container textarea {
+    border: 1px solid #363B4A !important;
+    border-radius: 6px !important;
+}
+.gradio-container input[type="text"]:focus,
+.gradio-container input[type="number"]:focus,
+.gradio-container textarea:focus {
+    border-color: #D4A843 !important;
+}
+/* -- Flèches de saisie numérique (spinners) visibles -- */
+.gradio-container input[type="number"]::-webkit-inner-spin-button,
+.gradio-container input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    filter: invert(0.85);
+}
+/* Bouton désactivé */
+.gradio-container button.primary[disabled],
+.gradio-container button.primary:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
 }
 .gradio-container {
     max-width: 1100px !important;
