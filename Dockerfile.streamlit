@@ -1,0 +1,36 @@
+# Dockerfile pour le dashboard Streamlit de monitoring.
+#
+# Build :  docker build -f Dockerfile.streamlit -t monitoring-streamlit .
+# Run   :  docker run -p 8501:8501 monitoring-streamlit
+
+FROM python:3.12-slim
+
+# Pas de .pyc, logs immédiats
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# -- Librairie système requise par LightGBM (OpenMP) --
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# -- Dépendances Python (cache Docker si requirements inchangé) --
+COPY requirements.streamlit.txt .
+RUN pip install --no-cache-dir -r requirements.streamlit.txt
+
+# -- Code applicatif --
+COPY src/ src/
+COPY dashboard_streamlit/ dashboard_streamlit/
+
+# -- Artefacts modèle (si nécessaire pour le monitoring) --
+COPY model/model_simple.joblib model/model_simple.joblib
+COPY model/v5_ui_model_config.json model/v5_ui_model_config.json
+
+# -- Port Streamlit --
+EXPOSE 8501
+
+# -- Lancement --
+CMD ["streamlit", "run", "dashboard_streamlit/app.py", \
+     "--server.port=8501", "--server.address=0.0.0.0", \
+     "--server.headless=true"]

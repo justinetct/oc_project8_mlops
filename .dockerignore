@@ -22,10 +22,9 @@ tmp/
 logs/
 mlflow.db
 
-# Éléments non nécessaires au conteneur Gradio
+# Éléments non nécessaires aux conteneurs
 notebooks/
 scripts/
-dashboard_streamlit/
 tests/
 model/imported_model/
 model/model_metadata.json

@@ -53,6 +53,8 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── loader.py            # Chargement unique du modèle (singleton)
 │   ├── themes.py            # Thème Navy Gold + CSS
 │   └── assets/              # Logo SVG, favicon
+├── dashboard_streamlit/
+│   └── app.py               # Dashboard Streamlit de monitoring (placeholder)
 ├── model/
 │   ├── model_simple.joblib          # Modèle LightGBM local
 │   └── v5_ui_model_config.json      # Config (features, seuil, métriques)
@@ -66,7 +68,10 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── test_predict.py      # 7 tests — prédiction
 │   ├── test_validation.py   # 30 tests — validation des entrées
 │   └── test_integration.py  # 17 tests — intégration et helpers
-└── pyproject.toml           # Dépendances Poetry
+├── Dockerfile.gradio         # Image Docker — scoring Gradio
+├── Dockerfile.streamlit      # Image Docker — dashboard Streamlit
+├── Makefile                  # Commandes build / test / export
+└── pyproject.toml            # Dépendances Poetry
 ```
 
 ## Modèle
@@ -92,15 +97,22 @@ Le modèle allégé est chargé une seule fois au démarrage depuis model/model_
 
 ## Docker
 
+Deux services conteneurisés séparément :
+
+| Service | Image | Port | Commande |
+|---|---|---|---|
+| Scoring Gradio | `scoring-gradio` | 7860 | `make docker-build-gradio` |
+| Monitoring Streamlit | `monitoring-streamlit` | 8501 | `make docker-build-streamlit` |
+
 ```bash
-# Construire l'image
-make docker-build
+# Scoring Gradio
+make docker-build-gradio
+make docker-run-gradio        # → http://localhost:7860
 
-# Lancer le conteneur
-make docker-run
+# Dashboard Streamlit
+make docker-build-streamlit
+make docker-run-streamlit     # → http://localhost:8501
 ```
-
-L'application est accessible sur `http://localhost:7860`.
 
 ## Gestion des dépendances
 
@@ -108,17 +120,21 @@ Poetry est la source de vérité. Les dépendances sont organisées en groupes :
 
 | Groupe | Contenu | Usage |
 |---|---|---|
-| `main` | gradio, numpy, pandas, scikit-learn, lightgbm… | Runtime de l'app |
+| `main` | numpy, pandas, scikit-learn, lightgbm, joblib, python-dotenv | Socle commun (modèle + prédiction) |
+| `gradio` | gradio | Application de scoring |
+| `streamlit` | streamlit | Dashboard de monitoring |
 | `mlflow` | mlflow | Import du modèle depuis P6 |
-| `streamlit` | streamlit | Dashboard (à venir) |
 | `extras` | pyarrow, scipy, graphviz | Notebooks / exploration |
 | `dev` | pytest, black, ruff… | Développement |
 
-Pour régénérer `requirements.gradio.txt` après un changement de dépendances :
+Chaque service a son propre fichier de dépendances exporté depuis Poetry :
 
 ```bash
-make export-requirements
+make export-requirements-gradio      # → requirements.gradio.txt
+make export-requirements-streamlit   # → requirements.streamlit.txt
 ```
+
+> **Note :** `requests` est requis par `gradio.cli` mais n'est pas résolu par `poetry export`. La commande `make export-requirements-gradio` l'ajoute automatiquement si absent.
 
 ## Environnement
 
