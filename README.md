@@ -90,6 +90,36 @@ Le modèle allégé est chargé une seule fois au démarrage depuis model/model_
 | Âge minimum | 18 ans à la date de référence (2018-05-17) |
 | Cohérence dates | Emploi et document d'identité postérieurs à la naissance |
 
+## Docker
+
+```bash
+# Construire l'image
+make docker-build
+
+# Lancer le conteneur
+make docker-run
+```
+
+L'application est accessible sur `http://localhost:7860`.
+
+## Gestion des dépendances
+
+Poetry est la source de vérité. Les dépendances sont organisées en groupes :
+
+| Groupe | Contenu | Usage |
+|---|---|---|
+| `main` | gradio, numpy, pandas, scikit-learn, lightgbm… | Runtime de l'app |
+| `mlflow` | mlflow | Import du modèle depuis P6 |
+| `streamlit` | streamlit | Dashboard (à venir) |
+| `extras` | pyarrow, scipy, graphviz | Notebooks / exploration |
+| `dev` | pytest, black, ruff… | Développement |
+
+Pour régénérer `requirements.gradio.txt` après un changement de dépendances :
+
+```bash
+make export-requirements
+```
+
 ## Environnement
 
 ```bash

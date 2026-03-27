@@ -6,22 +6,29 @@ authors = [{ name = "Justine Tranchant" }]
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    # Socle runtime (modèle + prédiction + app Gradio)
     "gradio (>=5.0,<6.0)",
-    "streamlit (>=1.40,<2.0)",
-    "mlflow ==3.9.0",
     "numpy ==2.4.2",
     "pandas (>=2.2,<3.0)",
     "scikit-learn (>=1.5,<2.0)",
     "joblib (>=1.4,<2.0)",
     "python-dotenv (>=1.0,<2.0)",
     "lightgbm ==4.6.0",
-    "pyarrow ==22.0.0",
-    "scipy ==1.17.0",
-    "graphviz ==0.21",
 ]
 
 [tool.poetry]
 package-mode = false
+
+[tool.poetry.group.mlflow.dependencies]
+mlflow = "3.9.0"
+
+[tool.poetry.group.streamlit.dependencies]
+streamlit = ">=1.40,<2.0"
+
+[tool.poetry.group.extras.dependencies]
+pyarrow = "22.0.0"
+scipy = "1.17.0"
+graphviz = "0.21"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8"

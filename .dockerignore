@@ -1,0 +1,34 @@
+# Git & IDE
+.git/
+.github/
+.idea/
+.vscode/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Fichiers locaux
+.env
+.DS_Store
+.claude/
+tmp/
+logs/
+mlflow.db
+
+# Éléments non nécessaires au conteneur Gradio
+notebooks/
+scripts/
+dashboard_streamlit/
+tests/
+model/imported_model/
+model/model_metadata.json
+poetry.lock
+pyproject.toml
+requirements.txt

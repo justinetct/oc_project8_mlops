@@ -1,0 +1,35 @@
+# Dockerfile pour l'application Gradio de scoring crédit.
+#
+# Build :  docker build -f Dockerfile.gradio -t scoring-gradio .
+# Run   :  docker run -p 7860:7860 scoring-gradio
+
+FROM python:3.12-slim
+
+# Pas de .pyc, logs immédiats
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONWARNINGS="ignore::DeprecationWarning"
+
+WORKDIR /app
+
+# -- Librairie système requise par LightGBM (OpenMP) --
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# -- Dépendances Python (cache Docker si requirements inchangé) --
+COPY requirements.gradio.txt .
+RUN pip install --no-cache-dir -r requirements.gradio.txt
+
+# -- Code applicatif --
+COPY src/ src/
+COPY app_gradio/ app_gradio/
+
+# -- Artefacts modèle --
+COPY model/model_simple.joblib model/model_simple.joblib
+COPY model/v5_ui_model_config.json model/v5_ui_model_config.json
+
+# -- Port Gradio (standard Hugging Face Spaces) --
+EXPOSE 7860
+
+# -- Lancement --
+CMD ["python", "-m", "app_gradio.app"]

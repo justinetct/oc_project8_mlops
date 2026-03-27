@@ -159,31 +159,34 @@ EXAMPLES = [
 
 
 # ---------------------------------------------------------------------------
+# JS d'initialisation (dark mode + désactivation bouton si champs vides)
+# ---------------------------------------------------------------------------
+INIT_JS = """() => {
+    document.body.classList.add('dark');
+    function checkFields() {
+        const btn = document.querySelector('button.primary');
+        if (!btn) return;
+        const texts = document.querySelectorAll('textarea, input[type="text"]');
+        const numbers = document.querySelectorAll('input[type="number"]');
+        let empty = false;
+        texts.forEach(el => { if (!el.value.trim()) empty = true; });
+        numbers.forEach(el => { if (el.value === '') empty = true; });
+        btn.disabled = empty;
+    }
+    const obs = new MutationObserver(checkFields);
+    obs.observe(document.body, {childList: true, subtree: true});
+    document.body.addEventListener('input', checkFields);
+    setTimeout(checkFields, 500);
+}"""
+
+
+# ---------------------------------------------------------------------------
 # Construction de l'interface
 # ---------------------------------------------------------------------------
 def build_app() -> gr.Blocks:
     """Construit l'application Gradio."""
-    # JS : force dark mode + désactive le bouton si un champ est vide
-    init_js = """() => {
-        document.body.classList.add('dark');
-        function checkFields() {
-            const btn = document.querySelector('button.primary');
-            if (!btn) return;
-            const texts = document.querySelectorAll('textarea, input[type="text"]');
-            const numbers = document.querySelectorAll('input[type="number"]');
-            let empty = false;
-            texts.forEach(el => { if (!el.value.trim()) empty = true; });
-            numbers.forEach(el => { if (el.value === '') empty = true; });
-            btn.disabled = empty;
-        }
-        const obs = new MutationObserver(checkFields);
-        obs.observe(document.body, {childList: true, subtree: true});
-        document.body.addEventListener('input', checkFields);
-        setTimeout(checkFields, 500);
-    }"""
-
     with gr.Blocks(title="Prêt à Dépenser — Scoring Crédit",
-                    theme=THEME, css=CSS, js=init_js) as app:
+                    theme=THEME, css=CSS, js=INIT_JS) as app:
         gr.HTML(_logo_html())
 
         # Valeurs par défaut = premier exemple (profil senior stable)
