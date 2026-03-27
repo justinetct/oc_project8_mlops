@@ -70,6 +70,7 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   └── test_integration.py  # 17 tests — intégration et helpers
 ├── Dockerfile.gradio         # Image Docker — scoring Gradio
 ├── Dockerfile.streamlit      # Image Docker — dashboard Streamlit
+├── docker-compose.yml        # Lancement local des deux services
 ├── Makefile                  # Commandes build / test / export
 └── pyproject.toml            # Dépendances Poetry
 ```
@@ -105,11 +106,15 @@ Deux services conteneurisés séparément :
 | Monitoring Streamlit | `monitoring-streamlit` | 8501 | `make docker-build-streamlit` |
 
 ```bash
-# Scoring Gradio
+# Les deux services ensemble (Docker Compose)
+make compose-up               # → Gradio http://localhost:7860
+                               #   Streamlit http://localhost:8501
+make compose-down              # Arrêter les services
+
+# Ou séparément
 make docker-build-gradio
 make docker-run-gradio        # → http://localhost:7860
 
-# Dashboard Streamlit
 make docker-build-streamlit
 make docker-run-streamlit     # → http://localhost:8501
 ```

@@ -1,0 +1,25 @@
+# Docker Compose — Projet 8 OpenClassrooms (MLOps)
+#
+# Lance les deux services localement :
+#   docker compose up --build
+#
+# Accès :
+#   - Gradio (scoring)    : http://localhost:7860
+#   - Streamlit (monitoring) : http://localhost:8501
+
+services:
+  gradio:
+    build:
+      context: .
+      dockerfile: Dockerfile.gradio
+    ports:
+      - "7860:7860"
+    container_name: scoring-gradio
+
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    ports:
+      - "8501:8501"
+    container_name: monitoring-streamlit

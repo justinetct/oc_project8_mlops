@@ -3,7 +3,8 @@
 .PHONY: test coverage coverage-html \
         export-requirements-gradio export-requirements-streamlit \
         docker-build-gradio docker-run-gradio \
-        docker-build-streamlit docker-run-streamlit
+        docker-build-streamlit docker-run-streamlit \
+        compose-up compose-down compose-build
 
 # -- Tests ------------------------------------------------------------------
 test:
@@ -41,3 +42,13 @@ docker-build-streamlit: export-requirements-streamlit
 
 docker-run-streamlit:
 	docker run -p 8501:8501 monitoring-streamlit
+
+# -- Docker Compose (les deux services) ------------------------------------
+compose-build: export-requirements-gradio export-requirements-streamlit
+	docker compose build
+
+compose-up: export-requirements-gradio export-requirements-streamlit
+	docker compose up --build
+
+compose-down:
+	docker compose down
