@@ -248,5 +248,8 @@ def build_app() -> gr.Blocks:
 # Point d'entrée
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import os
+
+    port = int(os.environ.get("PORT", 7860))
     demo = build_app()
-    demo.launch(favicon_path=str(FAVICON_PATH))
+    demo.launch(server_name="0.0.0.0", server_port=port, favicon_path=str(FAVICON_PATH))
