@@ -1,7 +1,9 @@
 # CI/CD — Service Gradio de scoring crédit
 #
 # Déclenché sur push vers main ou sur pull request.
-# 3 étapes : tests → build Docker → déploiement Hugging Face.
+# 2 étapes : tests → build Docker.
+# Note : le déploiement Render sera ajouté dans un prochain workflow.
+# Hugging Face Spaces a été abandonné (instabilité persistante).
 
 name: CI Gradio
 
@@ -67,64 +69,3 @@ jobs:
       - name: Build de l'image Gradio
         run: docker build -f Dockerfile.gradio -t scoring-gradio .
 
-  # -----------------------------------------------------------------------
-  # 3. Déploiement vers Hugging Face Spaces (préprod Gradio)
-  # -----------------------------------------------------------------------
-  deploy-preprod:
-    runs-on: ubuntu-latest
-    needs: docker
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    env:
-      HF_SPACE: justinetct/oc-p8-gradio-preprod
-
-    steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
-
-      - name: Préparation du contenu du Space
-        run: |
-          mkdir -p deploy_gradio/app_gradio/assets
-          mkdir -p deploy_gradio/src
-          mkdir -p deploy_gradio/model
-
-          # Dockerfile (renommé pour HF)
-          cp Dockerfile.gradio deploy_gradio/Dockerfile
-
-          # Dépendances
-          cp requirements.gradio.txt deploy_gradio/
-
-          # Code applicatif
-          cp app_gradio/*.py deploy_gradio/app_gradio/
-          cp app_gradio/assets/* deploy_gradio/app_gradio/assets/
-          cp app_gradio/__init__.py deploy_gradio/app_gradio/
-
-          # Config
-          cp src/__init__.py deploy_gradio/src/
-          cp src/config.py deploy_gradio/src/
-
-          # Modèle (uniquement les 2 fichiers nécessaires)
-          cp model/model_simple.joblib deploy_gradio/model/
-          cp model/v5_ui_model_config.json deploy_gradio/model/
-
-          # README dédié au Space HF
-          printf '%s\n' \
-            '---' \
-            'title: "Prêt à Dépenser — Scoring Crédit"' \
-            'emoji: "📊"' \
-            'colorFrom: indigo' \
-            'colorTo: yellow' \
-            'sdk: docker' \
-            'app_port: 7860' \
-            'pinned: false' \
-            '---' \
-            > deploy_gradio/README.md
-
-      - name: Upload vers Hugging Face Spaces (préprod)
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN_GRADIO_PREPROD }}
-        run: |
-          pip install -q huggingface_hub
-          huggingface-cli upload $HF_SPACE deploy_gradio/ . \
-            --repo-type space \
-            --commit-message "deploy: update gradio space from ${{ github.sha }}"

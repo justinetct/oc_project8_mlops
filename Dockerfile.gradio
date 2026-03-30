@@ -30,7 +30,7 @@ COPY app_gradio/ app_gradio/
 COPY model/model_simple.joblib model/model_simple.joblib
 COPY model/v5_ui_model_config.json model/v5_ui_model_config.json
 
-# -- Port Gradio (standard Hugging Face Spaces) --
+# -- Port Gradio (7860 par défaut, configurable via $PORT pour Render) --
 EXPOSE 7860
 
 # -- Lancement --
