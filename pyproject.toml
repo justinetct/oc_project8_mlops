@@ -32,6 +32,9 @@ pyarrow = "22.0.0"
 scipy = "1.17.0"
 graphviz = "0.21"
 
+[tool.poetry.group.db.dependencies]
+psycopg2-binary = ">=2.9,<3.0"
+
 [tool.poetry.group.dev.dependencies]
 black = "^24.8"
 ipykernel = "^6.29"

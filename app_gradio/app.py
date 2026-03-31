@@ -14,8 +14,9 @@ from datetime import datetime
 
 import gradio as gr
 
-from app_gradio.predict import predict
+from app_gradio.predict import compute_ratios, predict
 from app_gradio.themes import CSS, FAVICON_PATH, LOGO_PATH, THEME
+from src.database import log_prediction
 from app_gradio.validation import validate
 from src.config import HOME_CREDIT_REFERENCE_DATE
 
@@ -100,6 +101,15 @@ def gradio_predict(
     }
 
     result = predict(user_input)
+
+    # -- Log en base (non-bloquant) --
+    features = compute_ratios(dict(user_input))
+    log_prediction(
+        score=result["score"],
+        label=result["label"],
+        threshold=result["threshold"],
+        features=features,
+    )
 
     score = result["score"]
     label = result["label"]

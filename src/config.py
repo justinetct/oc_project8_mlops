@@ -62,6 +62,7 @@ def get_paths() -> Paths:
 PATHS = get_paths()
 
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 SAFE_ROOT_LABEL = "<PROJECT_ROOT>"
 

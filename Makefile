@@ -18,14 +18,14 @@ coverage-html:
 
 # -- Export des dépendances -------------------------------------------------
 export-requirements-gradio:
-	poetry export --only main,gradio --without-hashes --format requirements.txt \
+	poetry export --only main,gradio,db --without-hashes --format requirements.txt \
 		| sed 's/ ;.*$$//' > requirements.gradio.txt
 	@# requests est requis par gradio.cli mais non résolu par poetry export
 	@grep -q "^requests==" requirements.gradio.txt || echo "requests>=2.28,<3" >> requirements.gradio.txt
 	@echo "requirements.gradio.txt généré ($(shell wc -l < requirements.gradio.txt) paquets)"
 
 export-requirements-streamlit:
-	poetry export --only main,streamlit --without-hashes --format requirements.txt \
+	poetry export --only main,streamlit,db --without-hashes --format requirements.txt \
 		| sed 's/ ;.*$$//' > requirements.streamlit.txt
 	@echo "requirements.streamlit.txt généré ($(shell wc -l < requirements.streamlit.txt) paquets)"
 

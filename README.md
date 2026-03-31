@@ -128,6 +128,7 @@ Poetry est la source de vérité. Les dépendances sont organisées en groupes :
 | `main` | numpy, pandas, scikit-learn, lightgbm, joblib, python-dotenv | Socle commun (modèle + prédiction) |
 | `gradio` | gradio | Application de scoring |
 | `streamlit` | streamlit | Dashboard de monitoring |
+| `db` | psycopg2-binary | Logging PostgreSQL |
 | `mlflow` | mlflow | Import du modèle depuis P6 |
 | `extras` | pyarrow, scipy, graphviz | Notebooks / exploration |
 | `dev` | pytest, black, ruff… | Développement |
@@ -140,6 +141,19 @@ make export-requirements-streamlit   # → requirements.streamlit.txt
 ```
 
 > **Note :** `requests` est requis par `gradio.cli` mais n'est pas résolu par `poetry export`. La commande `make export-requirements-gradio` l'ajoute automatiquement si absent.
+
+## Base de données
+
+Les prédictions sont loggées dans une table PostgreSQL `prediction_logs`.
+
+Créer la table (une seule fois, idempotent) :
+
+```bash
+poetry install --with db
+poetry run python scripts/create_tables.py
+```
+
+Requiert `DATABASE_URL` dans le `.env` (voir `.env.example`).
 
 ## Environnement
 

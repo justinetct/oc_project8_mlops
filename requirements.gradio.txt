@@ -28,6 +28,7 @@ orjson==3.11.7
 packaging==25.0
 pandas==2.3.3
 pillow==11.3.0
+psycopg2-binary==2.9.11
 pydantic-core==2.41.5
 pydantic==2.12.5
 pydub==0.25.1
