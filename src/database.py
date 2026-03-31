@@ -1,11 +1,14 @@
-"""Logging des prédictions en base PostgreSQL.
+"""Accès base PostgreSQL — écriture et lecture des prédictions.
 
-Utilisation :
+Écriture (Gradio) :
     from src.database import log_prediction
     log_prediction(score=0.12, label="Crédit accordé", threshold=0.25, features={...})
 
-La fonction est non-bloquante : toute erreur est loggée en warning
-mais ne fait pas échouer la prédiction.
+Lecture (Streamlit) :
+    from src.database import read_prediction_logs
+    df = read_prediction_logs(limit=1000)
+
+Les fonctions sont non-bloquantes : toute erreur est loggée en warning.
 Sans effet si DATABASE_URL n'est pas défini (développement local sans DB).
 """
 
@@ -14,6 +17,8 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +83,41 @@ def log_prediction(
                 cur.execute(_INSERT_SQL, params)
     except Exception as exc:  # noqa: BLE001
         logger.warning("log_prediction failed (non-blocking): %s", repr(exc))
+
+
+# ---------------------------------------------------------------------------
+# Lecture — utilisée par le dashboard Streamlit
+# ---------------------------------------------------------------------------
+
+_SELECT_SQL = """
+SELECT *
+FROM prediction_logs
+ORDER BY timestamp DESC
+LIMIT %(limit)s
+"""
+
+
+def read_prediction_logs(limit: int = 1000) -> pd.DataFrame:
+    """Lit les dernières prédictions depuis PostgreSQL.
+
+    Retourne un DataFrame vide (avec les bonnes colonnes) si la base
+    est inaccessible ou si DATABASE_URL n'est pas défini.
+    """
+    empty = pd.DataFrame()
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return empty
+
+    try:
+        import psycopg2
+
+        with psycopg2.connect(database_url) as conn:
+            df = pd.read_sql_query(
+                _SELECT_SQL,
+                conn,
+                params={"limit": limit},
+            )
+        return df
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("read_prediction_logs failed: %s", repr(exc))
+        return empty

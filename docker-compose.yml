@@ -22,4 +22,6 @@ services:
       dockerfile: Dockerfile.streamlit
     ports:
       - "8501:8501"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
     container_name: monitoring-streamlit
