@@ -10,10 +10,10 @@ from app_gradio.app import (
     gradio_predict,
     build_app,
     EXAMPLES,
-    _date_str_to_days,
     _error_html,
     _logo_html,
 )
+from app_gradio.scoring_service import date_str_to_days
 
 
 # -- Données de test réutilisées depuis les exemples de l'app --
@@ -85,19 +85,19 @@ def test_all_examples_produce_valid_result(example):
 # -------------------------------------------------------------------
 def test_date_str_to_days_past():
     """Une date antérieure à la référence donne un nombre négatif."""
-    days = _date_str_to_days("2018-05-16")  # veille de la référence
+    days = date_str_to_days("2018-05-16")  # veille de la référence
     assert days == -1
 
 
 def test_date_str_to_days_reference():
     """La date de référence elle-même donne 0."""
-    days = _date_str_to_days("2018-05-17")
+    days = date_str_to_days("2018-05-17")
     assert days == 0
 
 
 def test_date_str_to_days_known_value():
     """Vérifie un calcul connu : 1975-03-15 → -15769 jours."""
-    days = _date_str_to_days("1975-03-15")
+    days = date_str_to_days("1975-03-15")
     assert days == -15769
 
 

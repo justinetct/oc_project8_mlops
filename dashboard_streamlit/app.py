@@ -22,7 +22,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from src.database import read_prediction_logs
+from src.config import APP_ENV
+from src.database import ensure_tables, read_prediction_logs
+
+# Création automatique de la table si besoin (idempotent, non-bloquant).
+ensure_tables()
 
 # ---------------------------------------------------------------------------
 # Chemins assets
@@ -89,6 +93,22 @@ CUSTOM_CSS = f"""
     }}
     .top-bar .refresh-icon:hover {{
         opacity: 1;
+    }}
+    .top-bar .right-group {{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }}
+    .top-bar .env-badge {{
+        padding: 4px 10px;
+        background: rgba(59, 130, 246, 0.12);
+        color: #60A5FA;
+        border: 1px solid #3B82F6;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
     }}
 
     /* --- Compenser la barre fixe --- */
@@ -170,8 +190,12 @@ CUSTOM_CSS = f"""
 # ---------------------------------------------------------------------------
 # Configuration de la page
 # ---------------------------------------------------------------------------
+_PAGE_TITLE = "Prêt à Dépenser — Monitoring"
+if APP_ENV == "preprod":
+    _PAGE_TITLE = f"{_PAGE_TITLE} - preprod"
+
 st.set_page_config(
-    page_title="Prêt à Dépenser — Monitoring",
+    page_title=_PAGE_TITLE,
     page_icon="📊",
     layout="wide",
 )
@@ -186,12 +210,17 @@ REFRESH_ICON_PATH = ASSETS_DIR / "icon_refresh.svg"
 logo_b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode() if LOGO_PATH.exists() else ""
 refresh_b64 = base64.b64encode(REFRESH_ICON_PATH.read_bytes()).decode() if REFRESH_ICON_PATH.exists() else ""
 
+env_badge_html = '<span class="env-badge">Préprod</span>' if APP_ENV == "preprod" else ""
+
 st.markdown(
     f'<div class="top-bar">'
     f'<img class="bar-logo" src="data:image/svg+xml;base64,{logo_b64}" alt="Prêt à Dépenser">'
+    f'<div class="right-group">'
+    f'{env_badge_html}'
     f'<a href="/" target="_self" title="Rafraîchir les données">'
     f'<img class="refresh-icon" src="data:image/svg+xml;base64,{refresh_b64}" alt="Rafraîchir">'
     f'</a>'
+    f'</div>'
     f'</div>',
     unsafe_allow_html=True,
 )
