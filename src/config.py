@@ -64,6 +64,11 @@ PATHS = get_paths()
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Environnement d'exécution : "preprod" ou "prod".
+# Utilisé pour cloisonner les lignes de prediction_logs par environnement
+# et afficher un badge visuel sur les UI en préprod.
+APP_ENV = os.getenv("APP_ENV", "preprod")
+
 SAFE_ROOT_LABEL = "<PROJECT_ROOT>"
 
 

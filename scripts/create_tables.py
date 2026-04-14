@@ -3,7 +3,10 @@
 Usage :
     DATABASE_URL=postgresql://... python scripts/create_tables.py
 
-Idempotent : utilise CREATE TABLE IF NOT EXISTS.
+Idempotent :
+  - CREATE TABLE IF NOT EXISTS pour la création initiale
+  - ALTER TABLE ... ADD COLUMN IF NOT EXISTS pour ajouter la colonne
+    `environment` aux bases existantes (rattrapage sans migration)
 """
 
 import os
@@ -23,6 +26,7 @@ CREATE_PREDICTION_LOGS = """
 CREATE TABLE IF NOT EXISTS prediction_logs (
     id                          SERIAL           PRIMARY KEY,
     timestamp                   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    environment                 TEXT             NOT NULL DEFAULT 'preprod',
     score                       DOUBLE PRECISION NOT NULL,
     label                       TEXT             NOT NULL,
     threshold                   DOUBLE PRECISION NOT NULL,
@@ -43,10 +47,17 @@ CREATE TABLE IF NOT EXISTS prediction_logs (
 );
 """
 
+# Rattrapage pour les bases créées avant l'ajout de la colonne environment.
+ADD_ENVIRONMENT_COLUMN = """
+ALTER TABLE prediction_logs
+ADD COLUMN IF NOT EXISTS environment TEXT NOT NULL DEFAULT 'preprod';
+"""
+
 try:
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute(CREATE_PREDICTION_LOGS)
+            cur.execute(ADD_ENVIRONMENT_COLUMN)
     print("OK : table prediction_logs prête.")
 except Exception as exc:
     print(f"Erreur : {exc}", file=sys.stderr)

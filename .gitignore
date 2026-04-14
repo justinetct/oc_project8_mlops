@@ -16,3 +16,5 @@ tmp/
 logs/
 mlflow.db
 .claude/
+data/
+docs/
