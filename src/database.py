@@ -1,8 +1,12 @@
-"""Accès base PostgreSQL — écriture et lecture des prédictions.
+"""Accès base PostgreSQL — écriture et lecture du monitoring.
 
-Écriture (Gradio) :
+Écriture prédictions :
     from src.database import log_prediction
     log_prediction(score=0.12, label="Crédit accordé", threshold=0.25, features={...})
+
+Écriture erreurs :
+    from src.database import log_prediction_error
+    log_prediction_error(error_type="validation_error", error_message="...")
 
 Lecture (Streamlit) :
     from src.database import read_prediction_logs
@@ -15,9 +19,9 @@ Création automatique des tables au démarrage :
 Les fonctions sont non-bloquantes : toute erreur est loggée en warning.
 Sans effet si DATABASE_URL n'est pas défini (développement local sans DB).
 
-Cloisonnement par environnement : toutes les écritures tagguent la ligne
-avec APP_ENV (default "preprod"), et read_prediction_logs() ne retourne
-que les lignes du même environnement.
+Cloisonnement par environnement : toutes les écritures tagguent les lignes
+avec APP_ENV (default "preprod"), et les lectures ne retournent que les
+lignes du même environnement.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ logger = logging.getLogger(__name__)
 _INSERT_SQL = """
 INSERT INTO prediction_logs (
     environment,
+    duration_ms,
     score, label, threshold,
     ext_source_1, ext_source_2, ext_source_3,
     days_birth, days_employed, days_id_publish,
@@ -43,6 +48,7 @@ INSERT INTO prediction_logs (
     ratio_credit_annuity, ratio_goods_credit, ratio_annuity_income
 ) VALUES (
     %(environment)s,
+    %(duration_ms)s,
     %(score)s, %(label)s, %(threshold)s,
     %(EXT_SOURCE_1)s, %(EXT_SOURCE_2)s, %(EXT_SOURCE_3)s,
     %(DAYS_BIRTH)s, %(DAYS_EMPLOYED)s, %(DAYS_ID_PUBLISH)s,
@@ -56,6 +62,7 @@ _INSERT_SQL_WITH_TIMESTAMP = """
 INSERT INTO prediction_logs (
     timestamp,
     environment,
+    duration_ms,
     score, label, threshold,
     ext_source_1, ext_source_2, ext_source_3,
     days_birth, days_employed, days_id_publish,
@@ -65,6 +72,7 @@ INSERT INTO prediction_logs (
 ) VALUES (
     %(logged_at)s,
     %(environment)s,
+    %(duration_ms)s,
     %(score)s, %(label)s, %(threshold)s,
     %(EXT_SOURCE_1)s, %(EXT_SOURCE_2)s, %(EXT_SOURCE_3)s,
     %(DAYS_BIRTH)s, %(DAYS_EMPLOYED)s, %(DAYS_ID_PUBLISH)s,
@@ -84,6 +92,7 @@ CREATE TABLE IF NOT EXISTS prediction_logs (
     id                          SERIAL           PRIMARY KEY,
     timestamp                   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
     environment                 TEXT             NOT NULL DEFAULT 'preprod',
+    duration_ms                 DOUBLE PRECISION,
     score                       DOUBLE PRECISION NOT NULL,
     label                       TEXT             NOT NULL,
     threshold                   DOUBLE PRECISION NOT NULL,
@@ -109,9 +118,24 @@ ALTER TABLE prediction_logs
 ADD COLUMN IF NOT EXISTS environment TEXT NOT NULL DEFAULT 'preprod';
 """
 
+_ADD_DURATION_MS_COLUMN = """
+ALTER TABLE prediction_logs
+ADD COLUMN IF NOT EXISTS duration_ms DOUBLE PRECISION;
+"""
+
+_CREATE_PREDICTION_ERRORS = """
+CREATE TABLE IF NOT EXISTS prediction_errors (
+    id              SERIAL           PRIMARY KEY,
+    timestamp       TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    environment     TEXT             NOT NULL DEFAULT 'preprod',
+    error_type      TEXT             NOT NULL,
+    error_message   TEXT             NOT NULL
+);
+"""
+
 
 def ensure_tables() -> None:
-    """Crée la table prediction_logs si elle n'existe pas.
+    """Crée les tables de monitoring si elles n'existent pas.
 
     Idempotent. Non-bloquant : toute erreur est loggée en warning pour ne pas
     empêcher le service de démarrer. Sans effet si DATABASE_URL n'est pas défini.
@@ -127,7 +151,9 @@ def ensure_tables() -> None:
             with conn.cursor() as cur:
                 cur.execute(_CREATE_PREDICTION_LOGS)
                 cur.execute(_ADD_ENVIRONMENT_COLUMN)
-        logger.info("ensure_tables: prediction_logs prête (env=%s)", APP_ENV)
+                cur.execute(_ADD_DURATION_MS_COLUMN)
+                cur.execute(_CREATE_PREDICTION_ERRORS)
+        logger.info("ensure_tables: tables de monitoring prêtes (env=%s)", APP_ENV)
     except Exception as exc:  # noqa: BLE001
         logger.warning("ensure_tables failed (non-blocking): %s", repr(exc))
 
@@ -141,6 +167,7 @@ def log_prediction(
     label: str,
     threshold: float,
     features: dict[str, Any],
+    duration_ms: float | None = None,
     logged_at: Any | None = None,
 ) -> None:
     """Insère une ligne de log dans prediction_logs.
@@ -159,6 +186,8 @@ def log_prediction(
         Seuil de décision utilisé.
     features : dict
         Les 14 features (11 saisies + 3 ratios calculés).
+    duration_ms : float, optional
+        Durée mesurée du flux de scoring, en millisecondes.
     logged_at : datetime, optional
         Timestamp explicite pour l'insertion. Si None, utilise DEFAULT NOW().
     """
@@ -171,6 +200,7 @@ def log_prediction(
 
         params: dict[str, Any] = {
             "environment": APP_ENV,
+            "duration_ms": duration_ms,
             "score": score,
             "label": label,
             "threshold": threshold,
@@ -192,6 +222,65 @@ def log_prediction(
         logger.warning("log_prediction failed (non-blocking): %s", repr(exc))
 
 
+_INSERT_ERROR_SQL = """
+INSERT INTO prediction_errors (
+    environment,
+    error_type,
+    error_message
+) VALUES (
+    %(environment)s,
+    %(error_type)s,
+    %(error_message)s
+)
+"""
+
+_INSERT_ERROR_SQL_WITH_TIMESTAMP = """
+INSERT INTO prediction_errors (
+    timestamp,
+    environment,
+    error_type,
+    error_message
+) VALUES (
+    %(logged_at)s,
+    %(environment)s,
+    %(error_type)s,
+    %(error_message)s
+)
+"""
+
+
+def log_prediction_error(
+    error_type: str,
+    error_message: str,
+    logged_at: Any | None = None,
+) -> None:
+    """Insère une erreur métier ou technique dans prediction_errors."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return
+
+    try:
+        import psycopg2
+
+        params: dict[str, Any] = {
+            "environment": APP_ENV,
+            "error_type": error_type,
+            "error_message": error_message,
+        }
+
+        if logged_at is not None:
+            sql = _INSERT_ERROR_SQL_WITH_TIMESTAMP
+            params["logged_at"] = logged_at
+        else:
+            sql = _INSERT_ERROR_SQL
+
+        with psycopg2.connect(database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("log_prediction_error failed (non-blocking): %s", repr(exc))
+
+
 # ---------------------------------------------------------------------------
 # Lecture — utilisée par le dashboard Streamlit
 # ---------------------------------------------------------------------------
@@ -202,6 +291,26 @@ FROM prediction_logs
 WHERE environment = %(environment)s
 ORDER BY timestamp DESC
 LIMIT %(limit)s
+"""
+
+_SELECT_ERRORS_SQL = """
+SELECT *
+FROM prediction_errors
+WHERE environment = %(environment)s
+ORDER BY timestamp DESC
+LIMIT %(limit)s
+"""
+
+_COUNT_PREDICTIONS_SQL = """
+SELECT COUNT(*)
+FROM prediction_logs
+WHERE environment = %(environment)s
+"""
+
+_COUNT_ERRORS_SQL = """
+SELECT COUNT(*)
+FROM prediction_errors
+WHERE environment = %(environment)s
 """
 
 
@@ -221,12 +330,68 @@ def read_prediction_logs(limit: int = 1000) -> pd.DataFrame:
         import psycopg2
 
         with psycopg2.connect(database_url) as conn:
-            df = pd.read_sql_query(
-                _SELECT_SQL,
-                conn,
-                params={"environment": APP_ENV, "limit": limit},
-            )
-        return df
+            with conn.cursor() as cur:
+                cur.execute(_SELECT_SQL, {"environment": APP_ENV, "limit": limit})
+                rows = cur.fetchall()
+                columns = [desc[0] for desc in cur.description]
+        return pd.DataFrame(rows, columns=columns)
     except Exception as exc:  # noqa: BLE001
         logger.warning("read_prediction_logs failed: %s", repr(exc))
         return empty
+
+
+def read_prediction_errors(limit: int = 1000) -> pd.DataFrame:
+    """Lit les dernières erreurs depuis PostgreSQL pour l'environnement courant."""
+    empty = pd.DataFrame()
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return empty
+
+    try:
+        import psycopg2
+
+        with psycopg2.connect(database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(_SELECT_ERRORS_SQL, {"environment": APP_ENV, "limit": limit})
+                rows = cur.fetchall()
+                columns = [desc[0] for desc in cur.description]
+        return pd.DataFrame(rows, columns=columns)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("read_prediction_errors failed: %s", repr(exc))
+        return empty
+
+
+def count_prediction_logs() -> int:
+    """Compte toutes les prédictions de l'environnement courant."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return 0
+
+    try:
+        import psycopg2
+
+        with psycopg2.connect(database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(_COUNT_PREDICTIONS_SQL, {"environment": APP_ENV})
+                return int(cur.fetchone()[0])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("count_prediction_logs failed: %s", repr(exc))
+        return 0
+
+
+def count_prediction_errors() -> int:
+    """Compte toutes les erreurs de l'environnement courant."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return 0
+
+    try:
+        import psycopg2
+
+        with psycopg2.connect(database_url) as conn:
+            with conn.cursor() as cur:
+                cur.execute(_COUNT_ERRORS_SQL, {"environment": APP_ENV})
+                return int(cur.fetchone()[0])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("count_prediction_errors failed: %s", repr(exc))
+        return 0

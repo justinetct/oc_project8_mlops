@@ -5,8 +5,8 @@ Usage :
 
 Idempotent :
   - CREATE TABLE IF NOT EXISTS pour la création initiale
-  - ALTER TABLE ... ADD COLUMN IF NOT EXISTS pour ajouter la colonne
-    `environment` aux bases existantes (rattrapage sans migration)
+  - ALTER TABLE ... ADD COLUMN IF NOT EXISTS pour ajouter les colonnes
+    de rattrapage sans migration lourde
 """
 
 import os
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS prediction_logs (
     id                          SERIAL           PRIMARY KEY,
     timestamp                   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
     environment                 TEXT             NOT NULL DEFAULT 'preprod',
+    duration_ms                 DOUBLE PRECISION,
     score                       DOUBLE PRECISION NOT NULL,
     label                       TEXT             NOT NULL,
     threshold                   DOUBLE PRECISION NOT NULL,
@@ -53,12 +54,29 @@ ALTER TABLE prediction_logs
 ADD COLUMN IF NOT EXISTS environment TEXT NOT NULL DEFAULT 'preprod';
 """
 
+ADD_DURATION_MS_COLUMN = """
+ALTER TABLE prediction_logs
+ADD COLUMN IF NOT EXISTS duration_ms DOUBLE PRECISION;
+"""
+
+CREATE_PREDICTION_ERRORS = """
+CREATE TABLE IF NOT EXISTS prediction_errors (
+    id              SERIAL           PRIMARY KEY,
+    timestamp       TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    environment     TEXT             NOT NULL DEFAULT 'preprod',
+    error_type      TEXT             NOT NULL,
+    error_message   TEXT             NOT NULL
+);
+"""
+
 try:
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             cur.execute(CREATE_PREDICTION_LOGS)
             cur.execute(ADD_ENVIRONMENT_COLUMN)
-    print("OK : table prediction_logs prête.")
+            cur.execute(ADD_DURATION_MS_COLUMN)
+            cur.execute(CREATE_PREDICTION_ERRORS)
+    print("OK : tables prediction_logs et prediction_errors prêtes.")
 except Exception as exc:
     print(f"Erreur : {exc}", file=sys.stderr)
     sys.exit(1)

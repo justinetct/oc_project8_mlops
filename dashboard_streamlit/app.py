@@ -1,10 +1,10 @@
 """Dashboard Streamlit de monitoring — Prêt à Dépenser.
 
-Affiche les métriques issues de la table prediction_logs (PostgreSQL) :
-- KPIs globaux (volume, taux d'acceptation, scores)
+Affiche les métriques issues des tables de monitoring PostgreSQL :
+- KPIs globaux (volume, taux d'acceptation, scores, latence, erreurs)
 - Évolution temporelle (volume et score moyen par jour)
 - Distribution des scores par décision
-- Tableau des dernières prédictions
+- Tableaux des dernières prédictions et erreurs
 """
 
 import base64
@@ -23,7 +23,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from src.config import APP_ENV
-from src.database import ensure_tables, read_prediction_logs
+from src.database import (
+    count_prediction_errors,
+    count_prediction_logs,
+    ensure_tables,
+    read_prediction_errors,
+    read_prediction_logs,
+)
 
 # Création automatique de la table si besoin (idempotent, non-bloquant).
 ensure_tables()
@@ -226,40 +232,75 @@ st.markdown(
 )
 
 df = read_prediction_logs(limit=1000)
+errors_df = read_prediction_errors(limit=1000)
 
-if df.empty:
+if df.empty and errors_df.empty:
     st.warning(
-        "Aucune donnée de prédiction disponible. "
+        "Aucune donnée de monitoring disponible. "
         "Effectuez des prédictions via l'application Gradio pour alimenter ce dashboard."
     )
     st.stop()
+
+
+def _format_ms(value):
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{value:.1f} ms"
+
+
+def _format_score(value):
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{value:.4f}"
 
 # ---------------------------------------------------------------------------
 # Bloc A — KPIs globaux
 # ---------------------------------------------------------------------------
 st.header("Indicateurs clés")
 
-total = len(df)
-accepted = (df["label"] == "Crédit accordé").sum()
-acceptance_rate = accepted / total * 100
-mean_score = df["score"].mean()
-median_score = df["score"].median()
+total_predictions = count_prediction_logs()
+total_errors = count_prediction_errors()
+accepted = (df["label"] == "Crédit accordé").sum() if not df.empty else 0
+acceptance_rate = (accepted / len(df) * 100) if not df.empty else 0.0
+mean_score = df["score"].mean() if not df.empty else None
+median_score = df["score"].median() if not df.empty else None
+latency_values = df["duration_ms"].dropna() if "duration_ms" in df.columns else pd.Series(dtype=float)
+latency_mean = latency_values.mean() if not latency_values.empty else None
+latency_median = latency_values.median() if not latency_values.empty else None
+latency_max = latency_values.max() if not latency_values.empty else None
+error_rate = (
+    total_errors / (total_predictions + total_errors) * 100
+    if (total_predictions + total_errors) > 0
+    else 0.0
+)
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Prédictions totales", f"{total}")
+col1.metric("Prédictions totales", f"{total_predictions}")
 col2.metric("Taux d'acceptation", f"{acceptance_rate:.1f} %")
-col3.metric("Score moyen", f"{mean_score:.4f}")
-col4.metric("Score médian", f"{median_score:.4f}")
+col3.metric("Score moyen", _format_score(mean_score))
+col4.metric("Score médian", _format_score(median_score))
+
+col5, col6, col7, col8 = st.columns(4)
+col5.metric("Latence moyenne", _format_ms(latency_mean))
+col6.metric("Latence médiane", _format_ms(latency_median))
+col7.metric("Latence max", _format_ms(latency_max))
+col8.metric("Taux d'erreur", f"{error_rate:.1f} %")
+
+st.caption(
+    f"Erreurs totales : {total_errors} | "
+    f"Taux d'erreur = erreurs / (prédictions + erreurs)"
+)
 
 # ---------------------------------------------------------------------------
 # Préparation des données temporelles
 # ---------------------------------------------------------------------------
-df["date"] = pd.to_datetime(df["timestamp"]).dt.date
-daily = df.groupby("date").agg(
-    volume=("id", "count"),
-    score_moyen=("score", "mean"),
-).reset_index()
-daily["date"] = pd.to_datetime(daily["date"])
+if not df.empty:
+    df["date"] = pd.to_datetime(df["timestamp"]).dt.date
+    daily = df.groupby("date").agg(
+        volume=("id", "count"),
+        score_moyen=("score", "mean"),
+    ).reset_index()
+    daily["date"] = pd.to_datetime(daily["date"])
 
 # ---------------------------------------------------------------------------
 # Bloc B — Évolution temporelle
@@ -270,115 +311,155 @@ col_left, col_right = st.columns(2)
 
 with col_left:
     st.subheader("Volume par jour")
-    chart_volume = (
-        alt.Chart(daily)
-        .mark_bar(color=GOLD, cornerRadiusTopLeft=4, cornerRadiusTopRight=4, size=20)
-        .encode(
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("volume:Q", title="Nombre de prédictions"),
-            tooltip=["date:T", "volume:Q"],
+    if df.empty:
+        st.info("Aucune prédiction valide disponible pour l'évolution temporelle.")
+    else:
+        chart_volume = (
+            alt.Chart(daily)
+            .mark_bar(color=GOLD, cornerRadiusTopLeft=4, cornerRadiusTopRight=4, size=20)
+            .encode(
+                x=alt.X("date:T", title="Date"),
+                y=alt.Y("volume:Q", title="Nombre de prédictions"),
+                tooltip=["date:T", "volume:Q"],
+            )
+            .configure(background=BG_BLOCK)
+            .configure_axis(
+                labelColor=TEXT_SUBDUED, titleColor=TEXT_PRIMARY,
+                gridColor=BG_BORDER, domainColor=BG_BORDER, tickColor=BG_BORDER,
+            )
+            .configure_view(stroke="transparent")
+            .properties(height=220, padding={"top": 10, "bottom": 10, "left": 5, "right": 30})
         )
-        .configure(background=BG_BLOCK)
-        .configure_axis(
-            labelColor=TEXT_SUBDUED, titleColor=TEXT_PRIMARY,
-            gridColor=BG_BORDER, domainColor=BG_BORDER, tickColor=BG_BORDER,
-        )
-        .configure_view(stroke="transparent")
-        .properties(height=220, padding={"top": 10, "bottom": 10, "left": 5, "right": 5})
-    )
-    st.altair_chart(chart_volume, use_container_width=True)
+        st.altair_chart(chart_volume, width="stretch")
 
 with col_right:
     st.subheader("Score moyen par jour")
-    chart_score = (
-        alt.Chart(daily)
-        .mark_line(point=True, color=GOLD)
-        .encode(
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("score_moyen:Q", title="Score moyen"),
-            tooltip=["date:T", alt.Tooltip("score_moyen:Q", format=".4f")],
+    if df.empty:
+        st.info("Aucune prédiction valide disponible pour le score moyen.")
+    else:
+        chart_score = (
+            alt.Chart(daily)
+            .mark_line(point=True, color=GOLD)
+            .encode(
+                x=alt.X("date:T", title="Date"),
+                y=alt.Y("score_moyen:Q", title="Score moyen"),
+                tooltip=["date:T", alt.Tooltip("score_moyen:Q", format=".4f")],
+            )
+            .configure(background=BG_BLOCK)
+            .configure_axis(
+                labelColor=TEXT_SUBDUED, titleColor=TEXT_PRIMARY,
+                gridColor=BG_BORDER, domainColor=BG_BORDER, tickColor=BG_BORDER,
+            )
+            .configure_view(stroke="transparent")
+            .properties(height=220, padding={"top": 10, "bottom": 10, "left": 5, "right": 30})
         )
-        .configure(background=BG_BLOCK)
-        .configure_axis(
-            labelColor=TEXT_SUBDUED, titleColor=TEXT_PRIMARY,
-            gridColor=BG_BORDER, domainColor=BG_BORDER, tickColor=BG_BORDER,
-        )
-        .configure_view(stroke="transparent")
-        .properties(height=220, padding={"top": 10, "bottom": 10, "left": 5, "right": 5})
-    )
-    st.altair_chart(chart_score, use_container_width=True)
+        st.altair_chart(chart_score, width="stretch")
 
 # ---------------------------------------------------------------------------
 # Bloc C — Distribution du score
 # ---------------------------------------------------------------------------
 st.header("Distribution des scores")
 
-threshold_value = df["threshold"].iloc[0]
+if df.empty:
+    st.info("Aucune prédiction valide disponible pour la distribution des scores.")
+else:
+    threshold_value = df["threshold"].iloc[0]
 
-hist = (
-    alt.Chart(df)
-    .mark_bar(opacity=0.8)
-    .encode(
-        x=alt.X("score:Q", bin=alt.Bin(maxbins=30), title="Score"),
-        y=alt.Y("count()", title="Nombre"),
-        color=alt.Color(
-            "label:N",
-            scale=alt.Scale(
-                domain=["Crédit accordé", "Crédit refusé"],
-                range=[GREEN, RED],
+    hist = (
+        alt.Chart(df)
+        .mark_bar(opacity=0.8)
+        .encode(
+            x=alt.X("score:Q", bin=alt.Bin(maxbins=30), title="Score"),
+            y=alt.Y("count()", title="Nombre"),
+            color=alt.Color(
+                "label:N",
+                scale=alt.Scale(
+                    domain=["Crédit accordé", "Crédit refusé"],
+                    range=[GREEN, RED],
+                ),
+                title="Décision",
             ),
-            title="Décision",
-        ),
-        tooltip=["label:N", "count()"],
+            tooltip=["label:N", "count()"],
+        )
     )
-)
 
-threshold_line = (
-    alt.Chart(pd.DataFrame({"threshold": [threshold_value]}))
-    .mark_rule(color=GOLD, strokeDash=[6, 3], strokeWidth=2)
-    .encode(x="threshold:Q")
-)
-
-threshold_text = (
-    alt.Chart(pd.DataFrame({"threshold": [threshold_value], "text": ["seuil"]}))
-    .mark_text(align="left", dx=5, dy=-10, fontSize=12, fontWeight="bold", color=GOLD)
-    .encode(x="threshold:Q", text="text:N")
-)
-
-chart_dist = (
-    (hist + threshold_line + threshold_text)
-    .configure(background=BG_BLOCK)
-    .configure_axis(
-        labelColor=TEXT_SUBDUED, titleColor=TEXT_PRIMARY,
-        gridColor=BG_BORDER, domainColor=BG_BORDER, tickColor=BG_BORDER,
+    threshold_line = (
+        alt.Chart(pd.DataFrame({"threshold": [threshold_value]}))
+        .mark_rule(color=GOLD, strokeDash=[6, 3], strokeWidth=2)
+        .encode(x="threshold:Q")
     )
-    .configure_legend(
-        labelColor=TEXT_PRIMARY, titleColor=TEXT_SUBDUED,
-        orient="top", direction="horizontal",
-    )
-    .configure_view(stroke="transparent")
-    .properties(height=260, padding={"top": 10, "bottom": 10, "left": 5, "right": 5})
-)
 
-st.altair_chart(chart_dist, use_container_width=True)
+    threshold_text = (
+        alt.Chart(pd.DataFrame({"threshold": [threshold_value], "text": ["seuil"]}))
+        .mark_text(align="left", dx=5, dy=-10, fontSize=12, fontWeight="bold", color=GOLD)
+        .encode(x="threshold:Q", text="text:N")
+    )
+
+    chart_dist = (
+        (hist + threshold_line + threshold_text)
+        .configure(background=BG_BLOCK)
+        .configure_axis(
+            labelColor=TEXT_SUBDUED, titleColor=TEXT_PRIMARY,
+            gridColor=BG_BORDER, domainColor=BG_BORDER, tickColor=BG_BORDER,
+        )
+        .configure_legend(
+            labelColor=TEXT_PRIMARY, titleColor=TEXT_SUBDUED,
+            orient="top", direction="horizontal",
+        )
+        .configure_view(stroke="transparent")
+        .properties(height=260, padding={"top": 10, "bottom": 10, "left": 5, "right": 5})
+    )
+
+    st.altair_chart(chart_dist, width="stretch")
 
 # ---------------------------------------------------------------------------
 # Bloc D — Dernières prédictions
 # ---------------------------------------------------------------------------
 st.header("Dernières prédictions")
 
-display_df = df[["id", "timestamp", "score", "label", "threshold"]].head(20).copy()
-display_df["timestamp"] = pd.to_datetime(display_df["timestamp"]).dt.strftime("%Y-%m-%d %H:%M")
+if df.empty:
+    st.info("Aucune prédiction valide disponible pour le tableau détaillé.")
+else:
+    display_df = df[
+        ["id", "timestamp", "score", "label", "threshold", "duration_ms"]
+    ].head(20).copy()
+    display_df["timestamp"] = pd.to_datetime(display_df["timestamp"]).dt.strftime("%Y-%m-%d %H:%M")
 
-st.dataframe(
-    display_df,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "id": st.column_config.NumberColumn("ID"),
-        "timestamp": st.column_config.TextColumn("Date"),
-        "score": st.column_config.NumberColumn("Score", format="%.4f"),
-        "label": st.column_config.TextColumn("Décision"),
-        "threshold": st.column_config.NumberColumn("Seuil", format="%.2f"),
-    },
-)
+    st.dataframe(
+        display_df,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "id": st.column_config.NumberColumn("ID"),
+            "timestamp": st.column_config.TextColumn("Date"),
+            "score": st.column_config.NumberColumn("Score", format="%.4f"),
+            "label": st.column_config.TextColumn("Décision"),
+            "threshold": st.column_config.NumberColumn("Seuil", format="%.2f"),
+            "duration_ms": st.column_config.NumberColumn("Latence (ms)", format="%.1f"),
+        },
+    )
+
+# ---------------------------------------------------------------------------
+# Bloc E — Dernières erreurs
+# ---------------------------------------------------------------------------
+st.header("Dernières erreurs")
+
+if errors_df.empty:
+    st.info("Aucune erreur enregistrée pour l'environnement courant.")
+else:
+    error_display_df = errors_df[
+        ["id", "timestamp", "error_type", "error_message"]
+    ].head(20).copy()
+    error_display_df["timestamp"] = pd.to_datetime(error_display_df["timestamp"]).dt.strftime("%Y-%m-%d %H:%M")
+
+    st.dataframe(
+        error_display_df,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "id": st.column_config.NumberColumn("ID"),
+            "timestamp": st.column_config.TextColumn("Date"),
+            "error_type": st.column_config.TextColumn("Type d'erreur"),
+            "error_message": st.column_config.TextColumn("Message"),
+        },
+    )

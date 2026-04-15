@@ -23,8 +23,10 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from time import perf_counter
 from urllib.parse import urlsplit
 
+import numpy as np
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
@@ -51,17 +53,50 @@ FILES = {
 # ============================================================
 
 
-def generate_timestamps(n: int, start_days_ago: float, end_days_ago: float) -> list:
-    """Genere n timestamps reguliers entre deux bornes."""
+def generate_timestamps(
+    n: int,
+    start_days_ago: float,
+    end_days_ago: float,
+    seed: int = 42,
+) -> list:
+    """Genere n timestamps avec une repartition journaliere naturelle et reproductible.
+
+    - Chaque journee de la fenetre recoit un poids tire dans [0.7, 1.3] (seed fixe).
+    - Les poids sont normalises puis convertis en comptes entiers de somme exacte n.
+    - Les timestamps sont ensuite disperses dans la journee correspondante.
+    """
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=start_days_ago)
     end = now - timedelta(days=end_days_ago)
 
-    if n == 1:
-        return [start]
+    if n == 0:
+        return []
 
-    step = (end - start) / (n - 1)
-    return [start + step * i for i in range(n)]
+    rng = np.random.default_rng(seed)
+    n_days = max(1, round((end - start).total_seconds() / 86400))
+
+    # Poids journaliers bornes : evite volumes plats et pics absurdes
+    weights = rng.uniform(0.7, 1.3, size=n_days)
+    weights /= weights.sum()
+
+    # Comptes entiers par jour, somme exacte = n
+    raw = weights * n
+    counts = np.floor(raw).astype(int)
+    remainder = int(n - counts.sum())
+    if remainder > 0:
+        order = np.argsort(-(raw - counts))
+        for i in range(remainder):
+            counts[order[i % n_days]] += 1
+
+    # Dispersion intra-journee
+    timestamps = []
+    for day_idx, count in enumerate(counts):
+        day_start = start + timedelta(days=day_idx)
+        offsets = rng.uniform(0, 86400, size=int(count))
+        timestamps.extend(day_start + timedelta(seconds=float(s)) for s in offsets)
+
+    timestamps.sort()
+    return timestamps
 
 
 # ============================================================
@@ -163,15 +198,17 @@ def score_technical_row(
     features: list[str],
     threshold: float,
     compute_ratios_fn,
-) -> tuple[float, str, float, dict]:
+) -> tuple[float, str, float, dict, float]:
     """Score une ligne technique et retourne score, label, seuil, features."""
+    start_time = perf_counter()
     data = compute_ratios_fn(row.to_dict())
     df = pd.DataFrame([data])[features]
 
     proba = float(model.predict_proba(df)[0, 1])
     label = "Crédit accordé" if proba < threshold else "Crédit refusé"
+    duration_ms = round((perf_counter() - start_time) * 1000, 3)
 
-    return round(proba, 6), label, threshold, data
+    return round(proba, 6), label, threshold, data, duration_ms
 
 
 def inject_lot(
@@ -187,7 +224,7 @@ def inject_lot(
 
     for idx, (_, row) in enumerate(df.iterrows()):
         try:
-            score, label, threshold, features = score_technical_row(
+            score, label, threshold, features, duration_ms = score_technical_row(
                 row=row,
                 model=runtime["model"],
                 features=runtime["features"],
@@ -199,6 +236,7 @@ def inject_lot(
                 label=label,
                 threshold=threshold,
                 features=features,
+                duration_ms=duration_ms,
                 logged_at=timestamps[idx],
             )
             inserted += 1
@@ -313,11 +351,13 @@ def main():
         len(df_baseline),
         start_days_ago=20,
         end_days_ago=10.001,
+        seed=42,
     )
     ts_drift = generate_timestamps(
         len(df_drift),
         start_days_ago=10,
         end_days_ago=0,
+        seed=43,
     )
 
     print("\nTimestamps generes :")
