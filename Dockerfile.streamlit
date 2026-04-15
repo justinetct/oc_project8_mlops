@@ -2,6 +2,8 @@
 #
 # Build :  docker build -f Dockerfile.streamlit -t monitoring-streamlit .
 # Run   :  docker run -p 8501:8501 monitoring-streamlit
+#
+# Port : 8501 par défaut (local), configurable via $PORT (Render).
 
 FROM python:3.12-slim
 
@@ -27,10 +29,13 @@ COPY dashboard_streamlit/ dashboard_streamlit/
 COPY model/model_simple.joblib model/model_simple.joblib
 COPY model/v5_ui_model_config.json model/v5_ui_model_config.json
 
-# -- Port Streamlit --
+# -- Port Streamlit (8501 par défaut, configurable via $PORT pour Render) --
 EXPOSE 8501
 
 # -- Lancement --
-CMD ["streamlit", "run", "dashboard_streamlit/app.py", \
-     "--server.port=8501", "--server.address=0.0.0.0", \
-     "--server.headless=true"]
+# sh -c permet l'expansion de $PORT (Render injecte un port dynamique).
+# exec remplace le shell par le process Streamlit (bonne gestion des signaux).
+CMD sh -c 'exec streamlit run dashboard_streamlit/app.py \
+  --server.port=${PORT:-8501} \
+  --server.address=0.0.0.0 \
+  --server.headless=true'

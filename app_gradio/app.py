@@ -10,26 +10,19 @@ par rapport à la date de référence du challenge Kaggle Home Credit (2018-05-1
 from __future__ import annotations
 
 import base64
-from datetime import datetime
 
 import gradio as gr
 
-from app_gradio.predict import predict
+from app_gradio.scoring_service import score_client
 from app_gradio.themes import CSS, FAVICON_PATH, LOGO_PATH, THEME
-from app_gradio.validation import validate
-from src.config import HOME_CREDIT_REFERENCE_DATE
+from src.config import APP_ENV
 
 
-# ---------------------------------------------------------------------------
-# Conversion dates -> jours (logique interne, invisible pour l'utilisateur)
-# ---------------------------------------------------------------------------
-def _date_str_to_days(date_str: str) -> int:
-    """Convertit une date 'YYYY-MM-DD' en nombre de jours relatif à la date de référence.
-
-    Résultat négatif si la date est antérieure à la référence (cas normal).
-    """
-    d = datetime.strptime(date_str, "%Y-%m-%d").date()
-    return (d - HOME_CREDIT_REFERENCE_DATE).days
+def _env_badge_html() -> str:
+    """Badge visuel de l'environnement (affiché uniquement en préprod)."""
+    if APP_ENV == "preprod":
+        return '<span class="env-badge">Préprod</span>'
+    return ""
 
 
 def _logo_html() -> str:
@@ -39,8 +32,17 @@ def _logo_html() -> str:
     return (
         '<div class="logo-container">'
         f'<img src="data:image/svg+xml;base64,{b64}" alt="Prêt à Dépenser">'
+        f'{_env_badge_html()}'
         "</div>"
     )
+
+
+def _app_title() -> str:
+    """Titre de la fenêtre, suffixé par l'environnement en préprod."""
+    base = "Prêt à Dépenser — Scoring Crédit"
+    if APP_ENV == "preprod":
+        return f"{base} - preprod"
+    return base
 
 
 def _error_html(errors: list[str]) -> str:
@@ -70,9 +72,11 @@ def gradio_predict(
     amt_income_total: float,
     is_married: str,
 ) -> str:
-    """Reçoit les champs UI lisibles et appelle predict() avec les features techniques."""
-    # -- Validation --
-    errors = validate(
+    """Reçoit les champs UI lisibles, appelle le service métier et formate le HTML."""
+    result = score_client(
+        ext_source_1=ext_source_1,
+        ext_source_2=ext_source_2,
+        ext_source_3=ext_source_3,
         date_naissance=date_naissance,
         date_embauche=date_embauche,
         date_id=date_id,
@@ -80,30 +84,17 @@ def gradio_predict(
         amt_goods_price=amt_goods_price,
         amt_credit=amt_credit,
         amt_income_total=amt_income_total,
+        is_married=is_married,
     )
-    if errors:
-        return _error_html(errors)
 
-    # -- Construction du dictionnaire technique --
-    user_input = {
-        "EXT_SOURCE_1": ext_source_1,
-        "EXT_SOURCE_2": ext_source_2,
-        "EXT_SOURCE_3": ext_source_3,
-        "DAYS_BIRTH": _date_str_to_days(date_naissance),
-        "DAYS_EMPLOYED": _date_str_to_days(date_embauche),
-        "DAYS_ID_PUBLISH": _date_str_to_days(date_id),
-        "AMT_ANNUITY": amt_annuity,
-        "AMT_GOODS_PRICE": amt_goods_price,
-        "AMT_CREDIT": amt_credit,
-        "AMT_INCOME_TOTAL": amt_income_total,
-        "NAME_FAMILY_STATUS_is_MARRIED": 1 if is_married == "Oui" else 0,
-    }
+    if not result.success:
+        return _error_html(result.errors)
 
-    result = predict(user_input)
+    return _result_html(result.score, result.label, result.threshold)
 
-    score = result["score"]
-    label = result["label"]
-    threshold = result["threshold"]
+
+def _result_html(score: float, label: str, threshold: float) -> str:
+    """Formate le HTML du résultat de scoring avec la jauge de risque."""
     granted = label == "Crédit accordé"
 
     # Position du score et du seuil sur la jauge (normalisés sur 0–50%)
@@ -185,7 +176,7 @@ INIT_JS = """() => {
 # ---------------------------------------------------------------------------
 def build_app() -> gr.Blocks:
     """Construit l'application Gradio."""
-    with gr.Blocks(title="Prêt à Dépenser — Scoring Crédit",
+    with gr.Blocks(title=_app_title(),
                     theme=THEME, css=CSS, js=INIT_JS) as app:
         gr.HTML(_logo_html())
 
@@ -248,5 +239,13 @@ def build_app() -> gr.Blocks:
 # Point d'entrée
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import os
+
+    from src.database import ensure_tables
+
+    # Création automatique de la table si besoin (idempotent, non-bloquant).
+    ensure_tables()
+
+    port = int(os.environ.get("PORT", 7860))
     demo = build_app()
-    demo.launch(favicon_path=str(FAVICON_PATH))
+    demo.launch(server_name="0.0.0.0", server_port=port, favicon_path=str(FAVICON_PATH))

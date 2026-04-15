@@ -23,11 +23,27 @@ COLOR_REFUSED = "#D9534F"
 # -- CSS complémentaire -----------------------------------------------------
 CSS = """
 .logo-container {
+    position: relative;
     text-align: center;
     padding: 20px 0 12px 0;
 }
 .logo-container img {
     height: 64px;
+}
+/* -- Badge environnement (affiché uniquement en préprod) -- */
+.env-badge {
+    position: absolute;
+    top: 20px;
+    right: 16px;
+    padding: 4px 10px;
+    background: rgba(59, 130, 246, 0.12);
+    color: #60A5FA;
+    border: 1px solid #3B82F6;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
 }
 /* -- Carte de résultat -- */
 .result-card {

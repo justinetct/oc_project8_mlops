@@ -8,6 +8,26 @@ Projet 8 OpenClassrooms — Parcours Data Scientist.
 
 Application de scoring crédit permettant d’estimer le risque d’un dossier et d’afficher une décision d’accord ou de refus.
 
+## Sommaire
+
+- [Fonctionnalités](#fonctionnalités)
+- [Lancer l'application](#lancer-lapplication)
+- [Lancer les tests](#lancer-les-tests)
+- [Structure du projet](#structure-du-projet)
+- [Modèle](#modèle)
+- [Déploiements](#déploiements)
+- [Schéma simple des services](#schéma-simple-des-services)
+- [Règles de validation](#règles-de-validation)
+- [Docker](#docker)
+- [Gestion des dépendances](#gestion-des-dépendances)
+- [Base de données](#base-de-données)
+- [Environnement](#environnement)
+
+## Accès rapides
+
+- **API de scoring Gradio (préprod)** : [oc-p8-gradio-preprod.onrender.com](https://oc-p8-gradio-preprod.onrender.com)
+- **Dashboard Streamlit (préprod)** : [oc-p8-streamlit-preprod.onrender.com](https://oc-p8-streamlit-preprod.onrender.com)
+
 ## Fonctionnalités
 
 - Interface Gradio avec saisie du profil client (dates, montants, scores externes)
@@ -15,6 +35,9 @@ Application de scoring crédit permettant d’estimer le risque d’un dossier e
 - Prédiction locale via un modèle LightGBM (pas de dépendance MLflow au runtime)
 - Carte de résultat avec jauge de risque et décision lisible
 - 3 exemples de profils pré-enregistrés pour la démo
+- Logging PostgreSQL des prédictions avec latence mesurée (`duration_ms`)
+- Logging des erreurs de validation / erreurs techniques dans `prediction_errors`
+- Dashboard Streamlit avec score, volume, latence et taux d'erreur
 
 ## Lancer l'application
 
@@ -54,16 +77,20 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── themes.py            # Thème Navy Gold + CSS
 │   └── assets/              # Logo SVG, favicon
 ├── dashboard_streamlit/
-│   └── app.py               # Dashboard Streamlit de monitoring (placeholder)
+│   └── app.py               # Dashboard Streamlit de monitoring (lecture PostgreSQL)
 ├── model/
 │   ├── model_simple.joblib          # Modèle LightGBM local
 │   └── v5_ui_model_config.json      # Config (features, seuil, métriques)
 ├── notebooks/
 │   └── 00_import_model_mlflow.ipynb  # Import du modèle depuis P6
 ├── scripts/
-│   └── import_model_mlflow.py        # Script d'import MLflow
+│   ├── import_model_mlflow.py        # Script d'import MLflow
+│   ├── prepare_demo_data.py          # Génération baseline/drift de démonstration
+│   ├── inject_demo_requests.py       # Injection technique baseline + drift en base
+│   └── inject_demo_errors.py         # Injection de cas d'erreur de démonstration
 ├── src/
-│   └── config.py            # Configuration centralisée (chemins, constantes)
+│   ├── config.py            # Configuration centralisée (chemins, constantes)
+│   └── database.py          # Accès PostgreSQL (logs, erreurs, création de tables)
 ├── tests/
 │   ├── test_predict.py      # 7 tests — prédiction
 │   ├── test_validation.py   # 30 tests — validation des entrées
@@ -86,6 +113,24 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 | Performance holdout | AUC = 0.761 |
 
 Le modèle allégé est chargé une seule fois au démarrage depuis model/model_simple.joblib. L’application fonctionne localement, sans dépendance à MLflow au runtime.
+
+## Déploiements
+
+Préproduction Render :
+
+Voir la section [Accès rapides](#accès-rapides) pour ouvrir directement les deux services.
+
+## Schéma simple des services
+
+```text
+Utilisateur
+   ├──> Gradio (scoring) ───> PostgreSQL (prediction_logs)
+   └──> Streamlit (monitoring) ──┘
+
+GitHub Actions ───> Render (déploiement après CI)
+Docker Compose ───> secours local pour Gradio + Streamlit
+```
+
 ## Règles de validation
 
 | Règle | Détail |
@@ -119,6 +164,8 @@ make docker-build-streamlit
 make docker-run-streamlit     # → http://localhost:8501
 ```
 
+> **Note :** en local, `docker-compose.yml` permet de lancer ensemble l’API Gradio et le dashboard Streamlit avec une configuration cohérente du projet.
+
 ## Gestion des dépendances
 
 Poetry est la source de vérité. Les dépendances sont organisées en groupes :
@@ -128,6 +175,7 @@ Poetry est la source de vérité. Les dépendances sont organisées en groupes :
 | `main` | numpy, pandas, scikit-learn, lightgbm, joblib, python-dotenv | Socle commun (modèle + prédiction) |
 | `gradio` | gradio | Application de scoring |
 | `streamlit` | streamlit | Dashboard de monitoring |
+| `db` | psycopg2-binary | Logging PostgreSQL |
 | `mlflow` | mlflow | Import du modèle depuis P6 |
 | `extras` | pyarrow, scipy, graphviz | Notebooks / exploration |
 | `dev` | pytest, black, ruff… | Développement |
@@ -140,6 +188,49 @@ make export-requirements-streamlit   # → requirements.streamlit.txt
 ```
 
 > **Note :** `requests` est requis par `gradio.cli` mais n'est pas résolu par `poetry export`. La commande `make export-requirements-gradio` l'ajoute automatiquement si absent.
+
+En résumé :
+- **Poetry** est utilisé pour le développement local et comme source de vérité.
+- **requirements.gradio.txt** et **requirements.streamlit.txt** sont utilisés pour les builds Docker et les déploiements Render.
+
+## Base de données
+
+Les prédictions sont loggées dans une table PostgreSQL `prediction_logs`.
+
+- **Gradio** écrit une ligne dans `prediction_logs` après chaque prédiction valide, avec score, décision et latence.
+- **Les erreurs** de validation ou techniques sont stockées dans `prediction_errors`.
+- **Streamlit** lit `prediction_logs` et `prediction_errors` pour afficher les indicateurs de monitoring.
+
+Créer la table (une seule fois, idempotent) :
+
+```bash
+poetry install --with db
+poetry run python scripts/create_tables.py
+```
+
+Requiert `DATABASE_URL` dans le `.env` (voir `.env.example`).
+
+Script utile pour vérifier rapidement les dernières lignes :
+
+```bash
+poetry run python scripts/check_logs.py
+```
+
+### Générer et injecter les données de démonstration
+
+```bash
+# Générer les deux jeux techniques de référence
+poetry run python scripts/prepare_demo_data.py
+
+# Injecter les prédictions de démonstration en prod
+poetry run python scripts/inject_demo_requests.py --environment prod --allow-demo-prod
+
+# Injecter quelques erreurs de démonstration en prod
+poetry run python scripts/inject_demo_errors.py --environment prod --allow-demo-prod
+
+# Lancer le dashboard sur l'environnement prod
+APP_ENV=prod poetry run streamlit run dashboard_streamlit/app.py
+```
 
 ## Environnement
 

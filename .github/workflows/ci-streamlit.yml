@@ -1,16 +1,16 @@
-# CI/CD — Service Gradio de scoring crédit
+# CI — Service Streamlit de monitoring crédit
 #
 # Déclenché sur push (main, staging, feature/*, fix/*) ou pull request vers main.
-# 3 étapes : tests → build Docker → déploiement Render préprod (staging uniquement).
+# 2 étapes : tests → build Docker.
 #
 # Stratégie de déploiement :
-#   - staging  → Render préprod (via deploy hook)
-#   - main     → Render prod (à venir)
-#   - autres   → tests + build Docker uniquement
+#   - staging → Render préprod (After CI Checks Pass, géré par Render)
+#   - main    → Render prod (à venir)
+#   - autres  → tests + build Docker uniquement
 #
 # Hugging Face Spaces a été abandonné (instabilité persistante).
 
-name: CI Gradio
+name: CI Streamlit
 
 on:
   push:
@@ -52,7 +52,7 @@ jobs:
           key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Installation des dépendances
-        run: poetry install --only main,gradio,dev
+        run: poetry install --only main,gradio,streamlit,dev
 
       - name: Lancement des tests
         run: poetry run pytest tests/ -v
@@ -60,9 +60,9 @@ jobs:
       - name: Vérification cohérence requirements
         run: |
           poetry self add poetry-plugin-export
-          make export-requirements-gradio
-          git diff --exit-code requirements.gradio.txt || \
-            echo "::warning::requirements.gradio.txt n'est pas à jour avec poetry.lock"
+          make export-requirements-streamlit
+          git diff --exit-code requirements.streamlit.txt || \
+            echo "::warning::requirements.streamlit.txt n'est pas à jour avec poetry.lock"
 
   # -----------------------------------------------------------------------
   # 2. Build de l'image Docker
@@ -75,26 +75,5 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Build de l'image Gradio
-        run: docker build -f Dockerfile.gradio -t scoring-gradio .
-
-  # -----------------------------------------------------------------------
-  # 3. Déploiement Render préprod (staging uniquement)
-  #
-  #    Déclenche un rebuild du service Render via son deploy hook.
-  #    Le service Render utilise le Dockerfile.gradio depuis le repo GitHub.
-  # -----------------------------------------------------------------------
-  deploy-preprod:
-    runs-on: ubuntu-latest
-    needs: docker
-    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
-
-    steps:
-      - name: Déclenchement du déploiement Render préprod
-        run: |
-          echo "Déploiement Render préprod — commit ${{ github.sha }}"
-          curl -s -o /dev/null -w "%{http_code}" \
-            -X POST "${{ secrets.RENDER_DEPLOY_HOOK_GRADIO_PREPROD }}" \
-            | grep -q "200" \
-            && echo "Deploy hook déclenché avec succès" \
-            || (echo "Erreur lors de l'appel au deploy hook" && exit 1)
+      - name: Build de l'image Streamlit
+        run: docker build -f Dockerfile.streamlit -t monitoring-streamlit .
