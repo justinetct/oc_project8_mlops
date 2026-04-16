@@ -232,6 +232,21 @@ poetry run python scripts/inject_demo_errors.py --environment prod --allow-demo-
 APP_ENV=prod poetry run streamlit run dashboard_streamlit/app.py
 ```
 
+## Performance — baseline
+
+Référence chiffrée des temps d'inférence et de réponse API (étape 4 du projet).
+
+```bash
+# Baseline in-process (inférence + service)
+poetry run python scripts/benchmark_baseline.py
+
+# Baseline complète avec HTTP (nécessite un serveur Gradio actif)
+poetry run python scripts/benchmark_baseline.py --http
+```
+
+Résultats : JSON horodatés dans [perf/results/](perf/results/).
+Protocole détaillé : [perf/README.md](perf/README.md).
+
 ## Environnement
 
 ```bash
