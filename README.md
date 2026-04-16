@@ -244,8 +244,10 @@ poetry run python scripts/benchmark_baseline.py
 poetry run python scripts/benchmark_baseline.py --http
 ```
 
-Résultats : JSON horodatés dans [perf/results/](perf/results/).
-Protocole détaillé : [perf/README.md](perf/README.md).
+Résultats : 
+- JSON horodatés dans [perf/results/](perf/results/)
+- Protocole détaillé : [perf/README.md](perf/README.md)
+- Analyse des goulots : [perf/bottlenecks_analysis.md](perf/bottlenecks_analysis.md)
 
 ## Environnement
 

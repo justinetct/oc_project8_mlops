@@ -1,0 +1,82 @@
+# Top 30 fonctions par temps cumulé (cumtime)
+
+         7255001 function calls (6985001 primitive calls) in 1.742 seconds
+
+   Ordered by: cumulative time
+   List reduced from 551 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     1000    0.005    0.000    1.748    0.002 scoring_service.py:59(score_client)
+     1000    0.006    0.000    1.682    0.002 predict.py:44(predict)
+     1000    0.002    0.000    1.246    0.001 pipeline.py:815(predict_proba)
+     1000    0.001    0.000    0.625    0.001 _set_output.py:314(wrapped)
+     1000    0.003    0.000    0.558    0.001 sklearn.py:1615(predict_proba)
+     1000    0.008    0.000    0.553    0.001 _base.py:595(transform)
+     1000    0.008    0.000    0.550    0.001 sklearn.py:1093(predict)
+     1000    0.002    0.000    0.515    0.001 _base.py:330(_validate_input)
+     1000    0.003    0.000    0.507    0.001 validation.py:2793(validate_data)
+     1000    0.014    0.000    0.479    0.000 validation.py:725(check_array)
+    11000    0.009    0.000    0.326    0.000 generic.py:6454(dtypes)
+    12000    0.040    0.000    0.311    0.000 series.py:392(__init__)
+     1000    0.001    0.000    0.301    0.000 basic.py:4701(predict)
+     1000    0.002    0.000    0.249    0.000 basic.py:1100(predict)
+     2000    0.007    0.000    0.246    0.000 frame.py:698(__init__)
+     1000    0.003    0.000    0.202    0.000 frame.py:4073(__getitem__)
+     1000    0.003    0.000    0.192    0.000 sklearn.py:801(_process_params)
+   174000    0.016    0.000    0.183    0.000 {built-in method builtins.hasattr}
+  1385000    0.106    0.000    0.168    0.000 {built-in method builtins.isinstance}
+2000/1000    0.003    0.000    0.155    0.000 sklearn.py:735(get_params)
+    30000    0.049    0.000    0.152    0.000 construction.py:517(sanitize_array)
+     1000    0.009    0.000    0.148    0.000 basic.py:827(_data_from_pandas)
+     1000    0.002    0.000    0.141    0.000 construction.py:96(arrays_to_mgr)
+     3000    0.008    0.000    0.139    0.000 base.py:240(get_params)
+     1000    0.003    0.000    0.131    0.000 base.py:6198(_get_indexer_strict)
+     4000    0.002    0.000    0.127    0.000 accessor.py:220(__get__)
+     4000    0.001    0.000    0.126    0.000 accessor.py:29(__init__)
+     3000    0.013    0.000    0.126    0.000 base.py:209(_get_param_names)
+     4000    0.004    0.000    0.125    0.000 accessor.py:246(_validate)
+     2000    0.001    0.000    0.106    0.000 inspect.py:3346(signature)
+
+
+
+
+# Top 30 fonctions par temps propre (tottime)
+
+         7255001 function calls (6985001 primitive calls) in 1.742 seconds
+
+   Ordered by: internal time
+   List reduced from 551 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+  1385000    0.106    0.000    0.168    0.000 {built-in method builtins.isinstance}
+     1000    0.087    0.000    0.097    0.000 basic.py:1286(__inner_predict_np2d)
+134000/6000    0.052    0.000    0.103    0.000 copy.py:118(deepcopy)
+    30000    0.049    0.000    0.152    0.000 construction.py:517(sanitize_array)
+    12000    0.040    0.000    0.311    0.000 series.py:392(__init__)
+428000/298000    0.037    0.000    0.050    0.000 {built-in method builtins.len}
+     2000    0.028    0.000    0.098    0.000 inspect.py:2397(_signature_from_function)
+354000/353000    0.027    0.000    0.045    0.000 {built-in method builtins.getattr}
+   383000    0.026    0.000    0.026    0.000 {method 'get' of 'dict' objects}
+    42000    0.023    0.000    0.042    0.000 inspect.py:2743(__init__)
+   147000    0.020    0.000    0.044    0.000 generic.py:42(_instancecheck)
+     6000    0.019    0.000    0.036    0.000 _strptime.py:392(_strptime)
+    11000    0.019    0.000    0.052    0.000 common.py:1606(pandas_dtype)
+    14000    0.017    0.000    0.028    0.000 construction.py:1028(convert)
+   147000    0.017    0.000    0.025    0.000 generic.py:37(_check)
+     1000    0.016    0.000    0.017    0.000 basic.py:637(get_by_alias)
+   174000    0.016    0.000    0.183    0.000 {built-in method builtins.hasattr}
+    14000    0.015    0.000    0.058    0.000 validation.py:681(_pandas_dtype_needs_early_conversion)
+     4000    0.015    0.000    0.084    0.000 copy.py:217(_deepcopy_dict)
+    16000    0.014    0.000    0.017    0.000 generic.py:281(__init__)
+     1000    0.014    0.000    0.479    0.000 validation.py:725(check_array)
+    50000    0.013    0.000    0.021    0.000 <frozen importlib._bootstrap>:1390(_handle_fromlist)
+     3000    0.013    0.000    0.126    0.000 base.py:209(_get_param_names)
+     4000    0.012    0.000    0.083    0.000 base.py:475(__new__)
+     1000    0.012    0.000    0.021    0.000 basic.py:543(_param_dict_to_str)
+    20000    0.011    0.000    0.019    0.000 numeric.py:323(full)
+19000/17000    0.011    0.000    0.093    0.000 generic.py:6306(__getattr__)
+46000/44000    0.011    0.000    0.039    0.000 {built-in method numpy.asarray}
+    12000    0.010    0.000    0.010    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+    12000    0.010    0.000    0.037    0.000 managers.py:1882(from_array)
+
+
