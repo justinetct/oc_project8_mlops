@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from app_gradio.loader import model, FEATURES, THRESHOLD
+from app_gradio.loader import FEATURES, THRESHOLD, get_onnx_session, model
 
 
 # -- Champs saisis par l'utilisateur --
@@ -41,8 +41,25 @@ def compute_ratios(data: dict) -> dict:
     return data
 
 
+def _score_onnx(df) -> float | None:
+    """Tente un scoring via ONNX Runtime. Retourne None si la session n'est pas dispo."""
+    import numpy as np
+
+    session = get_onnx_session()
+    if session is None:
+        return None
+    input_name = session.get_inputs()[0].name
+    X = df.to_numpy(dtype=np.float32)
+    outputs = session.run(None, {input_name: X})
+    probas = outputs[1] if len(outputs) > 1 else outputs[0]
+    return float(probas[0][1])
+
+
 def predict(user_input: dict) -> dict:
     """Prédiction à partir des 11 champs utilisateur.
+
+    Utilise ONNX Runtime si USE_ONNX=1 et artefact disponible,
+    sinon fallback sklearn (comportement par défaut, inchangé).
 
     Parameters
     ----------
@@ -61,14 +78,18 @@ def predict(user_input: dict) -> dict:
 
     df = pd.DataFrame([data])[FEATURES]
 
-    proba = model.predict_proba(df)[0, 1]
-    granted = proba < THRESHOLD
+    onnx_score = _score_onnx(df)
+    if onnx_score is not None:
+        proba = onnx_score
+    else:
+        proba = float(model.predict_proba(df)[0, 1])
 
+    granted = proba < THRESHOLD
     label = "Crédit accordé" if granted else "Crédit refusé"
     message = f"{label} (score={proba:.4f}, seuil={THRESHOLD})"
 
     return {
-        "score": round(float(proba), 6),
+        "score": round(proba, 6),
         "label": label,
         "threshold": THRESHOLD,
         "message": message,

@@ -77,10 +77,13 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=term-missing
 poetry run pytest tests/ --cov=app_gradio --cov-report=html
 ```
 
-54 tests couvrant :
+64 tests couvrant :
 - **Prédiction** : chargement du modèle, format de sortie, score, label — 7 tests (`test_predict.py`)
 - **Validation** : montants, dates, cohérence métier, types incorrects, edge cases — 30 tests (`test_validation.py`)
 - **Intégration** : chaîne complète UI → validation → prédiction, helpers, construction de l'app — 17 tests (`test_integration.py`)
+- **Service de scoring** : validation, appel au modèle, logging — 3 tests (`test_scoring_service.py`)
+- **Baseline performance** : stats et construction du DataFrame du benchmark — 4 tests (`test_benchmark_baseline.py`)
+- **Inférence ONNX** : fallback sklearn, cohérence des scores sklearn vs ONNX — 3 tests (`test_predict_onnx.py`)
 
 ## Structure du projet
 
@@ -96,6 +99,7 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   └── app.py               # Dashboard Streamlit de monitoring (lecture PostgreSQL)
 ├── model/
 │   ├── model_simple.joblib          # Modèle LightGBM local
+│   ├── model_simple.onnx            # Modèle converti en ONNX (inférence optionnelle via USE_ONNX=1)
 │   └── v5_ui_model_config.json      # Config (features, seuil, métriques)
 ├── notebooks/
 │   ├── 00_import_model_mlflow.ipynb      # Import du modèle depuis P6
@@ -111,15 +115,23 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── import_model_mlflow.py        # Script d'import MLflow
 │   ├── prepare_demo_data.py          # Génération baseline/drift de démonstration
 │   ├── inject_demo_requests.py       # Injection technique baseline + drift en base
-│   └── inject_demo_errors.py         # Injection de cas d'erreur de démonstration
+│   ├── inject_demo_errors.py         # Injection de cas d'erreur de démonstration
+│   ├── benchmark_baseline.py         # Benchmark inférence + service + HTTP
+│   ├── profile_bottlenecks.py        # cProfile + snapshot CPU/RAM
+│   ├── benchmark_onnx.py             # Faisabilité et benchmark sklearn vs ONNX
+│   ├── benchmark_postgres.py         # Benchmark HTTP sync vs async + intégrité logs
+│   └── check_logs.py                 # Inspection rapide des dernières lignes en base
 ├── src/
 │   ├── config.py            # Configuration centralisée (chemins, constantes)
-│   └── database.py          # Accès PostgreSQL (logs, erreurs, création de tables)
+│   └── database.py          # Accès PostgreSQL (logs sync/async, erreurs, création de tables)
 ├── tests/
-│   ├── test_predict.py      # 7 tests — prédiction
-│   ├── test_validation.py   # 30 tests — validation des entrées
-│   └── test_integration.py  # 17 tests — intégration et helpers
-├── Dockerfile.gradio         # Image Docker — scoring Gradio
+│   ├── test_predict.py              # 7 tests — prédiction
+│   ├── test_validation.py           # 30 tests — validation des entrées
+│   ├── test_integration.py          # 17 tests — intégration et helpers
+│   ├── test_scoring_service.py      # 3 tests — service de scoring
+│   ├── test_benchmark_baseline.py   # 4 tests — stats benchmark et DataFrame
+│   └── test_predict_onnx.py         # 3 tests — intégration ONNX et fallback
+├── Dockerfile.gradio         # Image Docker — scoring Gradio (convertit le modèle en ONNX au build)
 ├── Dockerfile.streamlit      # Image Docker — dashboard Streamlit
 ├── docker-compose.yml        # Lancement local des deux services
 ├── Makefile                  # Commandes build / test / export
@@ -240,6 +252,21 @@ Script utile pour vérifier rapidement les dernières lignes :
 ```bash
 poetry run python scripts/check_logs.py
 ```
+
+### Logging asynchrone (optionnel)
+
+Variable d'environnement optionnelle : `ASYNC_DB_LOGGING=1` sur le service Gradio.
+Si activée, les écritures dans `prediction_logs` passent dans un thread d'arrière-plan au lieu de bloquer la réponse HTTP. Utile pour réduire la latence utilisateur quand la base PostgreSQL est distante. Sans la variable, comportement synchrone (défaut, inchangé).
+
+Documentation complète : [perf/optimization_postgres.md](perf/optimization_postgres.md).
+
+### Inférence ONNX (optionnel)
+
+Variable d'environnement optionnelle : `USE_ONNX=1` sur le service Gradio.
+Si activée et si l'artefact `model/model_simple.onnx` est disponible, le scoring utilise ONNX Runtime. Sinon fallback sklearn (comportement par défaut).
+L'artefact est versionné dans le repo, de la même manière que `model_simple.joblib` : pas de génération au build, déploiement simple.
+
+Documentation complète : [perf/optimization_onnx.md](perf/optimization_onnx.md).
 
 ### Générer et injecter les données de démonstration
 
