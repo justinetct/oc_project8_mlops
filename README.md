@@ -22,6 +22,7 @@ Application de scoring crédit permettant d’estimer le risque d’un dossier e
 - [Docker](#docker)
 - [Gestion des dépendances](#gestion-des-dépendances)
 - [Base de données](#base-de-données)
+- [Performance](#performance)
 - [Monitoring et drift](#monitoring-et-drift)
 
 ## Accès rapides
@@ -97,7 +98,9 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── model_simple.joblib          # Modèle LightGBM local
 │   └── v5_ui_model_config.json      # Config (features, seuil, métriques)
 ├── notebooks/
-│   └── 00_import_model_mlflow.ipynb  # Import du modèle depuis P6
+│   ├── 00_import_model_mlflow.ipynb      # Import du modèle depuis P6
+│   ├── 01_monitoring_drift.ipynb         # Monitoring et démonstration de drift
+│   └── 02_performance_optimization.ipynb # Synthèse de l'étape 4 performances
 ├── perf/
 │   ├── README.md                    # protocole baseline
 │   ├── bottlenecks_analysis.md      # analyse des goulots
@@ -267,6 +270,8 @@ poetry run python scripts/benchmark_baseline.py --http
 ```
 
 Deux optimisations ont été étudiées : ONNX Runtime pour le moteur d’inférence et le logging PostgreSQL asynchrone pour le temps de réponse applicatif.
+
+Le notebook de synthèse correspondant est [`notebooks/02_performance_optimization.ipynb`](notebooks/02_performance_optimization.ipynb).
 
 Synthèse :
 - **ONNX Runtime** améliore fortement le moteur (scores équivalents, inférence ×50 environ), mais le gain absolu reste de l’ordre de la milliseconde.
