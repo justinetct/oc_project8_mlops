@@ -11,7 +11,8 @@ Application de scoring crédit permettant d’estimer le risque d’un dossier e
 ## Sommaire
 
 - [Fonctionnalités](#fonctionnalités)
-- [Lancer l'application](#lancer-lapplication)
+- [Environnement](#environnement)
+- [Lancer les applications](#lancer-les-applications)
 - [Lancer les tests](#lancer-les-tests)
 - [Structure du projet](#structure-du-projet)
 - [Modèle](#modèle)
@@ -21,7 +22,7 @@ Application de scoring crédit permettant d’estimer le risque d’un dossier e
 - [Docker](#docker)
 - [Gestion des dépendances](#gestion-des-dépendances)
 - [Base de données](#base-de-données)
-- [Environnement](#environnement)
+- [Monitoring et drift](#monitoring-et-drift)
 
 ## Accès rapides
 
@@ -39,14 +40,28 @@ Application de scoring crédit permettant d’estimer le risque d’un dossier e
 - Logging des erreurs de validation / erreurs techniques dans `prediction_errors`
 - Dashboard Streamlit avec score, volume, latence et taux d'erreur
 
-## Lancer l'application
+
+## Environnement
 
 ```bash
+poetry env use python3.12
 poetry install
-poetry run python -m app_gradio.app
 ```
 
-L'application s'ouvre sur `http://localhost:7860`.
+Python 3.12 requis. Poetry gère l'environnement de développement local.
+
+## Lancer les applications
+
+```bash
+# Application de scoring
+poetry run python -m app_gradio.app
+
+# Dashboard de monitoring
+poetry run streamlit run dashboard_streamlit/app.py
+```
+
+- Scoring Gradio : `http://localhost:7860`
+- Monitoring Streamlit : `http://localhost:8501`
 
 ## Lancer les tests
 
@@ -83,6 +98,12 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   └── v5_ui_model_config.json      # Config (features, seuil, métriques)
 ├── notebooks/
 │   └── 00_import_model_mlflow.ipynb  # Import du modèle depuis P6
+├── perf/
+│   ├── README.md                    # protocole baseline
+│   ├── bottlenecks_analysis.md      # analyse des goulots
+│   ├── optimization_onnx.md         # optimisation moteur
+│   ├── optimization_postgres.md     # optimisation applicative
+│   └── results/                     # résultats JSON et profiling
 ├── scripts/
 │   ├── import_model_mlflow.py        # Script d'import MLflow
 │   ├── prepare_demo_data.py          # Génération baseline/drift de démonstration
@@ -116,9 +137,10 @@ Le modèle allégé est chargé une seule fois au démarrage depuis model/model_
 
 ## Déploiements
 
-Préproduction Render :
+Les deux services sont déployés en préproduction sur Render.
+- **API de scoring Gradio (préprod)** : [oc-p8-gradio-preprod.onrender.com](https://oc-p8-gradio-preprod.onrender.com)
+- **Dashboard Streamlit (préprod)** : [oc-p8-streamlit-preprod.onrender.com](https://oc-p8-streamlit-preprod.onrender.com)
 
-Voir la section [Accès rapides](#accès-rapides) pour ouvrir directement les deux services.
 
 ## Schéma simple des services
 
@@ -232,9 +254,9 @@ poetry run python scripts/inject_demo_errors.py --environment prod --allow-demo-
 APP_ENV=prod poetry run streamlit run dashboard_streamlit/app.py
 ```
 
-## Performance — baseline
+## Performance
 
-Référence chiffrée des temps d'inférence et de réponse API (étape 4 du projet).
+Mesures de performance et optimisations documentées pour l'application de scoring.
 
 ```bash
 # Baseline in-process (inférence + service)
@@ -244,16 +266,39 @@ poetry run python scripts/benchmark_baseline.py
 poetry run python scripts/benchmark_baseline.py --http
 ```
 
-Résultats : 
-- JSON horodatés dans [perf/results/](perf/results/)
-- Protocole détaillé : [perf/README.md](perf/README.md)
-- Analyse des goulots : [perf/bottlenecks_analysis.md](perf/bottlenecks_analysis.md)
+Deux optimisations ont été étudiées : ONNX Runtime pour le moteur d’inférence et le logging PostgreSQL asynchrone pour le temps de réponse applicatif.
 
-## Environnement
+Synthèse :
+- **ONNX Runtime** améliore fortement le moteur (scores équivalents, inférence ×50 environ), mais le gain absolu reste de l’ordre de la milliseconde.
+- **PostgreSQL async** apporte un gain très net sur le temps HTTP **en local** (~918 ms gagnées en médiane).
+- Sur la **préprod Render**, ce gain n’est pas observé clairement : la variabilité de l’environnement partagé masque l’effet. L’optimisation reste intéressante, mais son impact dépend du contexte d’hébergement.
+
+Documentation disponible :
+- Résultats JSON dans [perf/results/](perf/results/)
+- Protocole de baseline : [perf/README.md](perf/README.md)
+- Analyse des goulots : [perf/bottlenecks_analysis.md](perf/bottlenecks_analysis.md)
+- Optimisation ONNX Runtime : [perf/optimization_onnx.md](perf/optimization_onnx.md)
+- Optimisation PostgreSQL async : [perf/optimization_postgres.md](perf/optimization_postgres.md)
+
+## Monitoring et drift
+
+Ici, on a **volontairement simulé** des scores externes plus faibles, des revenus plus bas, des crédits plus élevés et une annuité légèrement plus élevée.
+
+Jeux utilisés :
+- **baseline** : échantillon extrait du split de test du modèle source ;
+- **drift** : lot artificiellement drifté à partir de la baseline.
+
+Lancer la préparation des jeux et l’injection de démonstration :
 
 ```bash
-poetry env use python3.12
-poetry install
+# Génère monitoring_baseline.csv et monitoring_drift.csv 
+poetry run python scripts/prepare_demo_data.py
+# Injecte les requêtes de démonstration en base
+poetry run python scripts/inject_demo_requests.py --environment prod --allow-demo-prod
 ```
 
-Python 3.12 requis. Poetry gère l'environnement de développement local.
+Le notebook [`notebooks/01_monitoring_drift.ipynb`](notebooks/01_monitoring_drift.ipynb) documente deux usages :
+-  un aperçu des logs de prédiction ;
+- une démonstration contrôlée de drift avec Evidently.
+
+> Evidently détecte bien une dérive sur les variables ciblées. En revanche, d’autres variables ne franchissent pas le seuil statistique, ce qui montre aussi que l’outil ne remonte pas artificiellement tout comme “en drift”.
