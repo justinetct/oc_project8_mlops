@@ -26,8 +26,11 @@ lignes du même environnement.
 
 from __future__ import annotations
 
+import atexit
 import logging
 import os
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import pandas as pd
@@ -35,6 +38,40 @@ import pandas as pd
 from src.config import APP_ENV
 
 logger = logging.getLogger(__name__)
+
+# -----------------------------------------------------------------------------
+# Logging asynchrone optionnel (toggle via ASYNC_DB_LOGGING=1)
+# Sort l'écriture PostgreSQL du chemin critique de la réponse HTTP.
+# Par défaut désactivé : comportement identique à la version synchrone.
+# -----------------------------------------------------------------------------
+
+_ASYNC_LOGGING = os.environ.get("ASYNC_DB_LOGGING", "0") == "1"
+_executor: ThreadPoolExecutor | None = None
+
+
+def _get_executor() -> ThreadPoolExecutor:
+    global _executor
+    if _executor is None:
+        _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="db-logger")
+        atexit.register(_shutdown_executor)
+    return _executor
+
+
+def _shutdown_executor() -> None:
+    """Attend le drain des écritures en file à la fermeture du process."""
+    global _executor
+    if _executor is not None:
+        _executor.shutdown(wait=True)
+
+
+def _submit_safe(fn, *args, **kwargs) -> None:
+    """Soumet la fonction au pool avec capture d'exception (évite un échec silencieux)."""
+    def _run():
+        try:
+            fn(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[db-logger] écriture async échouée : {exc!r}", file=sys.stderr)
+    _get_executor().submit(_run)
 
 _INSERT_SQL = """
 INSERT INTO prediction_logs (
@@ -162,7 +199,7 @@ def ensure_tables() -> None:
 # Écriture
 # ---------------------------------------------------------------------------
 
-def log_prediction(
+def _log_prediction_sync(
     score: float,
     label: str,
     threshold: float,
@@ -170,26 +207,11 @@ def log_prediction(
     duration_ms: float | None = None,
     logged_at: Any | None = None,
 ) -> None:
-    """Insère une ligne de log dans prediction_logs.
+    """Implémentation synchrone de l'insertion dans prediction_logs.
 
     Non-bloquant : toute erreur est loggée en warning.
     Sans effet si DATABASE_URL n'est pas défini.
     La ligne est taguée avec APP_ENV (default "preprod").
-
-    Parameters
-    ----------
-    score : float
-        Probabilité de défaut retournée par le modèle.
-    label : str
-        "Crédit accordé" ou "Crédit refusé".
-    threshold : float
-        Seuil de décision utilisé.
-    features : dict
-        Les 14 features (11 saisies + 3 ratios calculés).
-    duration_ms : float, optional
-        Durée mesurée du flux de scoring, en millisecondes.
-    logged_at : datetime, optional
-        Timestamp explicite pour l'insertion. Si None, utilise DEFAULT NOW().
     """
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -222,6 +244,43 @@ def log_prediction(
         logger.warning("log_prediction failed (non-blocking): %s", repr(exc))
 
 
+def log_prediction(
+    score: float,
+    label: str,
+    threshold: float,
+    features: dict[str, Any],
+    duration_ms: float | None = None,
+    logged_at: Any | None = None,
+) -> None:
+    """Insère une ligne dans prediction_logs.
+
+    Dispatch synchrone (défaut) ou asynchrone si ASYNC_DB_LOGGING=1.
+    Signature et effets publics identiques à la version synchrone.
+
+    Parameters
+    ----------
+    score : float
+        Probabilité de défaut retournée par le modèle.
+    label : str
+        "Crédit accordé" ou "Crédit refusé".
+    threshold : float
+        Seuil de décision utilisé.
+    features : dict
+        Les 14 features (11 saisies + 3 ratios calculés).
+    duration_ms : float, optional
+        Durée mesurée du flux de scoring, en millisecondes.
+    logged_at : datetime, optional
+        Timestamp explicite pour l'insertion. Si None, utilise DEFAULT NOW().
+    """
+    if _ASYNC_LOGGING:
+        _submit_safe(
+            _log_prediction_sync,
+            score, label, threshold, features, duration_ms, logged_at,
+        )
+    else:
+        _log_prediction_sync(score, label, threshold, features, duration_ms, logged_at)
+
+
 _INSERT_ERROR_SQL = """
 INSERT INTO prediction_errors (
     environment,
@@ -249,12 +308,12 @@ INSERT INTO prediction_errors (
 """
 
 
-def log_prediction_error(
+def _log_prediction_error_sync(
     error_type: str,
     error_message: str,
     logged_at: Any | None = None,
 ) -> None:
-    """Insère une erreur métier ou technique dans prediction_errors."""
+    """Implémentation synchrone de l'insertion dans prediction_errors."""
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         return
@@ -279,6 +338,21 @@ def log_prediction_error(
                 cur.execute(sql, params)
     except Exception as exc:  # noqa: BLE001
         logger.warning("log_prediction_error failed (non-blocking): %s", repr(exc))
+
+
+def log_prediction_error(
+    error_type: str,
+    error_message: str,
+    logged_at: Any | None = None,
+) -> None:
+    """Insère une erreur métier ou technique dans prediction_errors.
+
+    Dispatch synchrone (défaut) ou asynchrone si ASYNC_DB_LOGGING=1.
+    """
+    if _ASYNC_LOGGING:
+        _submit_safe(_log_prediction_error_sync, error_type, error_message, logged_at)
+    else:
+        _log_prediction_error_sync(error_type, error_message, logged_at)
 
 
 # ---------------------------------------------------------------------------
