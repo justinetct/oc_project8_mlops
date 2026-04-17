@@ -1,14 +1,9 @@
-# CI — Service Streamlit de monitoring crédit
+# CI Streamlit — dashboard de monitoring.
 #
-# Déclenché sur push (main, staging, feature/*, fix/*) ou pull request vers main.
-# 2 étapes : tests → build Docker.
-#
-# Stratégie de déploiement :
-#   - staging → Render préprod (After CI Checks Pass, géré par Render)
-#   - main    → Render prod (à venir)
-#   - autres  → tests + build Docker uniquement
-#
-# Hugging Face Spaces a été abandonné (instabilité persistante).
+# Tests unitaires + build Docker sur push (main, staging, feature/*, fix/*, chore/*)
+# et pull request vers main. Le déploiement Render préprod sur la branche staging
+# est déclenché automatiquement par Render via "After CI Checks Pass" (aucune étape
+# de déploiement n'est définie dans ce workflow).
 
 name: CI Streamlit
 
@@ -19,6 +14,7 @@ on:
       - staging
       - 'feature/**'
       - 'fix/**'
+      - 'chore/**'
   pull_request:
     branches: [main]
 
@@ -61,11 +57,13 @@ jobs:
         run: |
           poetry self add poetry-plugin-export
           make export-requirements-streamlit
-          git diff --exit-code requirements.streamlit.txt || \
-            echo "::warning::requirements.streamlit.txt n'est pas à jour avec poetry.lock"
+          git diff --exit-code requirements.streamlit.txt || {
+            echo "::error::requirements.streamlit.txt n'est pas à jour avec poetry.lock. Lancez 'make export-requirements-streamlit' et commitez le fichier mis à jour."
+            exit 1
+          }
 
   # -----------------------------------------------------------------------
-  # 2. Build de l'image Docker
+  # 2. Build de l'image Docker (exécuté uniquement si les tests ont passé)
   # -----------------------------------------------------------------------
   docker:
     runs-on: ubuntu-latest
