@@ -26,8 +26,9 @@ RUN pip install --no-cache-dir -r requirements.gradio.txt
 COPY src/ src/
 COPY app_gradio/ app_gradio/
 
-# -- Artefacts modèle --
+# -- Artefacts modèle (joblib + ONNX versionnés dans le repo) --
 COPY model/model_simple.joblib model/model_simple.joblib
+COPY model/model_simple.onnx model/model_simple.onnx
 COPY model/v5_ui_model_config.json model/v5_ui_model_config.json
 
 # -- Port Gradio (7860 par défaut, configurable via $PORT pour Render) --
