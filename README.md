@@ -22,8 +22,8 @@ Application de scoring crédit permettant d’estimer le risque d’un dossier e
 - [Docker](#docker)
 - [Gestion des dépendances](#gestion-des-dépendances)
 - [Base de données](#base-de-données)
-- [Performance](#performance)
 - [Monitoring et drift](#monitoring-et-drift)
+- [Performance](#performance)
 
 ## Accès rapides
 
@@ -77,13 +77,13 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=term-missing
 poetry run pytest tests/ --cov=app_gradio --cov-report=html
 ```
 
-64 tests couvrant :
+69 tests couvrant :
 - **Prédiction** : chargement du modèle, format de sortie, score, label — 7 tests (`test_predict.py`)
 - **Validation** : montants, dates, cohérence métier, types incorrects, edge cases — 30 tests (`test_validation.py`)
 - **Intégration** : chaîne complète UI → validation → prédiction, helpers, construction de l'app — 17 tests (`test_integration.py`)
 - **Service de scoring** : validation, appel au modèle, logging — 3 tests (`test_scoring_service.py`)
 - **Baseline performance** : stats et construction du DataFrame du benchmark — 4 tests (`test_benchmark_baseline.py`)
-- **Inférence ONNX** : fallback sklearn, cohérence des scores sklearn vs ONNX — 3 tests (`test_predict_onnx.py`)
+- **Inférence ONNX** : fallback sklearn, cohérence des scores sklearn vs ONNX, chargement conditionnel et cache de la session ONNX — 8 tests (`test_predict_onnx.py`)
 
 ## Structure du projet
 
@@ -284,6 +284,31 @@ poetry run python scripts/inject_demo_errors.py --environment prod --allow-demo-
 APP_ENV=prod poetry run streamlit run dashboard_streamlit/app.py
 ```
 
+
+## Monitoring et drift
+
+Ici, on a **volontairement simulé** des scores externes plus faibles, des revenus plus bas, des crédits plus élevés et une annuité légèrement plus élevée.
+
+Jeux utilisés :
+- **baseline** : échantillon extrait du split de test du modèle source ;
+- **drift** : lot artificiellement drifté à partir de la baseline.
+
+Lancer la préparation des jeux et l’injection de démonstration :
+
+```bash
+# Génère monitoring_baseline.csv et monitoring_drift.csv 
+poetry run python scripts/prepare_demo_data.py
+# Injecte les requêtes de démonstration en base
+poetry run python scripts/inject_demo_requests.py --environment prod --allow-demo-prod
+```
+
+Le notebook [`notebooks/01_monitoring_drift.ipynb`](notebooks/01_monitoring_drift.ipynb) documente deux usages :
+-  un aperçu des logs de prédiction ;
+- une démonstration contrôlée de drift avec Evidently.
+
+> Evidently détecte bien une dérive sur les variables ciblées. En revanche, d’autres variables ne franchissent pas le seuil statistique, ce qui montre aussi que l’outil ne remonte pas artificiellement tout comme “en drift”.
+
+
 ## Performance
 
 Mesures de performance et optimisations documentées pour l'application de scoring.
@@ -311,26 +336,3 @@ Documentation disponible :
 - Analyse des goulots : [perf/bottlenecks_analysis.md](perf/bottlenecks_analysis.md)
 - Optimisation ONNX Runtime : [perf/optimization_onnx.md](perf/optimization_onnx.md)
 - Optimisation PostgreSQL async : [perf/optimization_postgres.md](perf/optimization_postgres.md)
-
-## Monitoring et drift
-
-Ici, on a **volontairement simulé** des scores externes plus faibles, des revenus plus bas, des crédits plus élevés et une annuité légèrement plus élevée.
-
-Jeux utilisés :
-- **baseline** : échantillon extrait du split de test du modèle source ;
-- **drift** : lot artificiellement drifté à partir de la baseline.
-
-Lancer la préparation des jeux et l’injection de démonstration :
-
-```bash
-# Génère monitoring_baseline.csv et monitoring_drift.csv 
-poetry run python scripts/prepare_demo_data.py
-# Injecte les requêtes de démonstration en base
-poetry run python scripts/inject_demo_requests.py --environment prod --allow-demo-prod
-```
-
-Le notebook [`notebooks/01_monitoring_drift.ipynb`](notebooks/01_monitoring_drift.ipynb) documente deux usages :
--  un aperçu des logs de prédiction ;
-- une démonstration contrôlée de drift avec Evidently.
-
-> Evidently détecte bien une dérive sur les variables ciblées. En revanche, d’autres variables ne franchissent pas le seuil statistique, ce qui montre aussi que l’outil ne remonte pas artificiellement tout comme “en drift”.

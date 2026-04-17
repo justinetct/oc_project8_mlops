@@ -77,3 +77,80 @@ def test_predict_falls_back_to_sklearn_when_session_is_none(monkeypatch):
     result = predict_mod.predict(SAMPLE_INPUT)
     assert 0.0 <= result["score"] <= 1.0
     assert result["label"] in ("Crédit accordé", "Crédit refusé")
+
+
+# ---------------------------------------------------------------------------
+# Tests in-process de get_onnx_session() — couvrent les branches que les tests
+# en sous-process ne voient pas du point de vue du collecteur de coverage.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fresh_loader(monkeypatch):
+    """Reset le singleton _onnx_session avant chaque test (évite la pollution de cache)."""
+    from app_gradio import loader
+    monkeypatch.setattr(loader, "_onnx_session", None)
+    return loader
+
+
+def test_loader_returns_none_when_use_onnx_disabled(fresh_loader, monkeypatch):
+    """USE_ONNX=False → get_onnx_session retourne None."""
+    monkeypatch.setattr(fresh_loader, "USE_ONNX", False)
+    assert fresh_loader.get_onnx_session() is None
+
+
+def test_loader_returns_none_when_artifact_missing(fresh_loader, monkeypatch, tmp_path):
+    """USE_ONNX=True mais artefact absent → None (fallback sklearn)."""
+    monkeypatch.setattr(fresh_loader, "USE_ONNX", True)
+    monkeypatch.setattr(fresh_loader, "ONNX_PATH", tmp_path / "missing.onnx")
+    assert fresh_loader.get_onnx_session() is None
+
+
+def test_loader_returns_none_when_load_fails(fresh_loader, monkeypatch, tmp_path):
+    """Fichier corrompu → InferenceSession lève → None (fallback sklearn)."""
+    bad = tmp_path / "bad.onnx"
+    bad.write_bytes(b"this is not a valid onnx file")
+    monkeypatch.setattr(fresh_loader, "USE_ONNX", True)
+    monkeypatch.setattr(fresh_loader, "ONNX_PATH", bad)
+    assert fresh_loader.get_onnx_session() is None
+
+
+@pytest.mark.skipif(not ONNX_PATH.exists(), reason="artefact ONNX absent")
+def test_loader_returns_session_and_caches(fresh_loader, monkeypatch):
+    """USE_ONNX=True + artefact présent → session chargée puis mise en cache."""
+    monkeypatch.setattr(fresh_loader, "USE_ONNX", True)
+
+    session = fresh_loader.get_onnx_session()
+    assert session is not None
+
+    # Deuxième appel : hit du cache (même objet)
+    assert fresh_loader.get_onnx_session() is session
+
+
+@pytest.mark.skipif(not ONNX_PATH.exists(), reason="artefact ONNX absent")
+def test_predict_uses_onnx_in_process(fresh_loader, monkeypatch):
+    """predict() passe réellement par ONNX : on casse sklearn et on vérifie qu'il n'est pas appelé.
+
+    Preuve que le chemin ONNX est bien emprunté : si le fallback sklearn avait lieu,
+    model.predict_proba serait appelé et le test échouerait explicitement.
+    Le score ONNX doit aussi rester cohérent avec la référence sklearn (tolérance 1e-4).
+    """
+    # Référence sklearn avant le patching (USE_ONNX encore False ici)
+    from app_gradio.predict import predict
+    sklearn_reference = predict(SAMPLE_INPUT)["score"]
+
+    # Active ONNX + invalide sklearn : tout appel à model.predict_proba fera échouer le test
+    monkeypatch.setattr(fresh_loader, "USE_ONNX", True)
+
+    def _sklearn_should_not_be_called(*args, **kwargs):
+        raise AssertionError(
+            "model.predict_proba ne doit pas être appelé quand ONNX prend la main"
+        )
+    monkeypatch.setattr(fresh_loader.model, "predict_proba", _sklearn_should_not_be_called)
+
+    result = predict(SAMPLE_INPUT)
+
+    # Si on arrive ici, c'est que predict() est passé par ONNX (sinon l'AssertionError aurait levé)
+    assert 0.0 <= result["score"] <= 1.0
+    assert result["label"] in ("Crédit accordé", "Crédit refusé")
+    assert abs(result["score"] - sklearn_reference) < 1e-4
