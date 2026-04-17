@@ -8,6 +8,7 @@ Aucune dépendance à MLflow : on charge le joblib extrait à l'import.
 from __future__ import annotations
 
 import json
+import os
 import joblib
 from pathlib import Path
 
@@ -45,3 +46,40 @@ config = _load_config()
 
 FEATURES: list[str] = config["features"]
 THRESHOLD: float = config["metrics"]["best_threshold_holdout"]
+
+
+# ---------------------------------------------------------------------------
+# Chargement ONNX optionnel (activé par USE_ONNX=1)
+# ---------------------------------------------------------------------------
+
+USE_ONNX: bool = os.environ.get("USE_ONNX", "0") == "1"
+ONNX_PATH: Path = PATHS.model / "model_simple.onnx"
+
+_onnx_session = None  # singleton module-level
+
+
+def get_onnx_session():
+    """Retourne la session ONNX si dispo, sinon None (fallback sklearn).
+
+    Mis en cache : chargé une seule fois au premier appel. Un message
+    simple est affiché pour indiquer le chemin retenu.
+    """
+    global _onnx_session
+    if _onnx_session is not None:
+        return _onnx_session
+    if not USE_ONNX:
+        print("[loader] USE_ONNX désactivé → inférence sklearn")
+        return None
+    if not ONNX_PATH.exists():
+        print(f"[loader] artefact ONNX introuvable ({ONNX_PATH.name}) → fallback sklearn")
+        return None
+    try:
+        import onnxruntime as ort
+        _onnx_session = ort.InferenceSession(
+            str(ONNX_PATH), providers=["CPUExecutionProvider"]
+        )
+        print(f"[loader] ONNX activé ({ONNX_PATH.name})")
+        return _onnx_session
+    except Exception as exc:  # noqa: BLE001
+        print(f"[loader] chargement ONNX échoué ({exc!r}) → fallback sklearn")
+        return None
