@@ -24,11 +24,14 @@ Application de scoring crédit permettant d’estimer le risque d’un dossier e
 - [Base de données](#base-de-données)
 - [Monitoring et drift](#monitoring-et-drift)
 - [Performance](#performance)
+- [Non-régression fonctionnelle](#non-régression-fonctionnelle)
 
 ## Accès rapides
 
 - **API de scoring Gradio (préprod)** : [oc-p8-gradio-preprod.onrender.com](https://oc-p8-gradio-preprod.onrender.com)
 - **Dashboard Streamlit (préprod)** : [oc-p8-streamlit-preprod.onrender.com](https://oc-p8-streamlit-preprod.onrender.com)
+- **API de scoring Gradio (prod)** : [oc-p8-gradio-prod.onrender.com](https://oc-p8-gradio-prod.onrender.com)
+- **Dashboard Streamlit (prod)** : [oc-p8-streamlit-prod.onrender.com](https://oc-p8-streamlit-prod.onrender.com)
 
 ## Fonctionnalités
 
@@ -77,13 +80,14 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=term-missing
 poetry run pytest tests/ --cov=app_gradio --cov-report=html
 ```
 
-69 tests couvrant :
+72 tests couvrant :
 - **Prédiction** : chargement du modèle, format de sortie, score, label — 7 tests (`test_predict.py`)
 - **Validation** : montants, dates, cohérence métier, types incorrects, edge cases — 30 tests (`test_validation.py`)
 - **Intégration** : chaîne complète UI → validation → prédiction, helpers, construction de l'app — 17 tests (`test_integration.py`)
 - **Service de scoring** : validation, appel au modèle, logging — 3 tests (`test_scoring_service.py`)
 - **Baseline performance** : stats et construction du DataFrame du benchmark — 4 tests (`test_benchmark_baseline.py`)
 - **Inférence ONNX** : fallback sklearn, cohérence des scores sklearn vs ONNX, chargement conditionnel et cache de la session ONNX — 8 tests (`test_predict_onnx.py`)
+- **Non-régression fonctionnelle** : comparaison sklearn vs ONNX sur profils contrastés — 3 tests (`test_non_regression.py`)
 
 ## Structure du projet
 
@@ -120,7 +124,8 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── profile_bottlenecks.py        # cProfile + snapshot CPU/RAM
 │   ├── benchmark_onnx.py             # Faisabilité et benchmark sklearn vs ONNX
 │   ├── benchmark_postgres.py         # Benchmark HTTP sync vs async + intégrité logs
-│   └── check_logs.py                 # Inspection rapide des dernières lignes en base
+│   ├── check_logs.py                 # Inspection rapide des dernières lignes en base
+│   └── check_non_regression.py       # Comparaison sklearn vs ONNX sur profils contrastés
 ├── src/
 │   ├── config.py            # Configuration centralisée (chemins, constantes)
 │   └── database.py          # Accès PostgreSQL (logs sync/async, erreurs, création de tables)
@@ -130,8 +135,9 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── test_integration.py          # 17 tests — intégration et helpers
 │   ├── test_scoring_service.py      # 3 tests — service de scoring
 │   ├── test_benchmark_baseline.py   # 4 tests — stats benchmark et DataFrame
-│   └── test_predict_onnx.py         # 3 tests — intégration ONNX et fallback
-├── Dockerfile.gradio         # Image Docker — scoring Gradio (convertit le modèle en ONNX au build)
+│   ├── test_predict_onnx.py         # 8 tests — intégration ONNX, fallback et coverage loader
+│   └── test_non_regression.py       # 3 tests — comparaison sklearn vs ONNX sur profils contrastés
+├── Dockerfile.gradio         # Image Docker — scoring Gradio (embarque le modèle ONNX versionné)
 ├── Dockerfile.streamlit      # Image Docker — dashboard Streamlit
 ├── docker-compose.yml        # Lancement local des deux services
 ├── Makefile                  # Commandes build / test / export
@@ -152,10 +158,32 @@ Le modèle allégé est chargé une seule fois au démarrage depuis model/model_
 
 ## Déploiements
 
-Les deux services sont déployés en préproduction sur Render.
+Les deux services sont déployés sur Render, en **préproduction** et en **production**. La base de données PostgreSQL utilisée par l'application est également hébergée sur Render.
+
 - **API de scoring Gradio (préprod)** : [oc-p8-gradio-preprod.onrender.com](https://oc-p8-gradio-preprod.onrender.com)
 - **Dashboard Streamlit (préprod)** : [oc-p8-streamlit-preprod.onrender.com](https://oc-p8-streamlit-preprod.onrender.com)
+- **API de scoring Gradio (prod)** : [oc-p8-gradio-prod.onrender.com](https://oc-p8-gradio-prod.onrender.com)
+- **Dashboard Streamlit (prod)** : [oc-p8-streamlit-prod.onrender.com](https://oc-p8-streamlit-prod.onrender.com)
 
+Le déploiement est automatisé :
+- après validation de la CI sur `staging`, la **préproduction** est redéployée automatiquement ;
+- après validation de la CI sur `main`, la **production** est redéployée automatiquement.
+
+Des déploiements manuels restent possibles ponctuellement pour tester une branche spécifique.
+
+### Variables d’environnement Render
+
+**Service Gradio**
+- `DATABASE_URL`
+- `APP_ENV` *(preprod/prod)*
+- `ASYNC_DB_LOGGING` *(optionnel)*
+- `USE_ONNX` *(optionnel)*
+
+**Service Streamlit**
+- `DATABASE_URL`
+- `APP_ENV` *(preprod/prod)*
+
+Voir aussi `.env.example` pour la configuration locale.
 
 ## Schéma simple des services
 
@@ -164,7 +192,8 @@ Utilisateur
    ├──> Gradio (scoring) ───> PostgreSQL (prediction_logs)
    └──> Streamlit (monitoring) ──┘
 
-GitHub Actions ───> Render (déploiement après CI)
+GitHub Actions ───> Render préprod (après CI sur staging)
+GitHub Actions ───> Render prod    (après CI sur main)
 Docker Compose ───> secours local pour Gradio + Streamlit
 ```
 
@@ -209,7 +238,7 @@ Poetry est la source de vérité. Les dépendances sont organisées en groupes :
 
 | Groupe | Contenu | Usage |
 |---|---|---|
-| `main` | numpy, pandas, scikit-learn, lightgbm, joblib, python-dotenv | Socle commun (modèle + prédiction) |
+| `main` | numpy, pandas, scikit-learn, lightgbm, joblib, python-dotenv, onnxruntime | Socle commun (modèle + prédiction) |
 | `gradio` | gradio | Application de scoring |
 | `streamlit` | streamlit | Dashboard de monitoring |
 | `db` | psycopg2-binary | Logging PostgreSQL |
@@ -232,7 +261,7 @@ En résumé :
 
 ## Base de données
 
-Les prédictions sont loggées dans une table PostgreSQL `prediction_logs`.
+Les prédictions sont loggées dans une base PostgreSQL hébergée sur Render, dans la table `prediction_logs`.
 
 - **Gradio** écrit une ligne dans `prediction_logs` après chaque prédiction valide, avec score, décision et latence.
 - **Les erreurs** de validation ou techniques sont stockées dans `prediction_errors`.
@@ -336,3 +365,20 @@ Documentation disponible :
 - Analyse des goulots : [perf/bottlenecks_analysis.md](perf/bottlenecks_analysis.md)
 - Optimisation ONNX Runtime : [perf/optimization_onnx.md](perf/optimization_onnx.md)
 - Optimisation PostgreSQL async : [perf/optimization_postgres.md](perf/optimization_postgres.md)
+
+## Non-régression fonctionnelle
+
+La comparaison entre **sklearn** et **ONNX** a été rejouée sur plusieurs profils contrastés pour vérifier qu’il n’y avait pas de divergence de décision après intégration.
+
+### Résultats
+
+| Profil | Score sklearn | Score ONNX | Écart | Verdict |
+|---|---:|---:|---:|---|
+| senior stable (exemple UI 1) | 0.027162 | 0.027162 | 0.00e+00 | OK |
+| jeune, emploi récent (exemple UI 2) | 0.355315 | 0.355315 | 0.00e+00 | OK |
+| profil intermédiaire (exemple UI 3) | 0.109203 | 0.109203 | 0.00e+00 | OK |
+| très bas risque (scores externes élevés) | 0.009301 | 0.009301 | 0.00e+00 | OK |
+| très haut risque (scores externes faibles) | 0.655020 | 0.658027 | 3.01e-03 | OK (écart notable) |
+| petits montants | 0.046232 | 0.046232 | 0.00e+00 | OK |
+
+Conclusion : sur 6 profils contrastés, les décisions restent identiques. Un profil présente un écart de score allant jusqu’à `3.01e-03`, compatible avec la différence de précision `float32` (ONNX) vs `float64` (sklearn). Cet écart ne change aucune décision finale : **pas de régression fonctionnelle utilisateur**.
