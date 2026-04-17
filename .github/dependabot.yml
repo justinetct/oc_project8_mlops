@@ -1,0 +1,14 @@
+# Configuration Dependabot.
+#
+# Scope explicitement les scans sur le manifest de production (pyproject.toml
+# à la racine). Le dossier model/imported_model/ est un export MLflow du
+# projet 6 qui n'est pas utilisé en runtime (exclu via .dockerignore) ; ses
+# dépendances transitives ne sont pas pertinentes pour ce service.
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
