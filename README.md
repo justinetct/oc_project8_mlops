@@ -74,13 +74,16 @@ poetry run streamlit run dashboard_streamlit/app.py
 poetry run pytest tests/ -v
 
 # Avec couverture (terminal)
-poetry run pytest tests/ --cov=app_gradio --cov-report=term-missing
+poetry run pytest tests/ --cov=app_gradio --cov=dashboard_streamlit.logic --cov-report=term-missing
 
 # Rapport de couverture HTML
-poetry run pytest tests/ --cov=app_gradio --cov-report=html
+poetry run pytest tests/ --cov=app_gradio --cov=dashboard_streamlit.logic --cov-report=html
+
+# Tests dashboard uniquement (logique pure)
+poetry run pytest tests/test_dashboard_logic.py --cov=dashboard_streamlit.logic -v
 ```
 
-72 tests couvrant :
+76 tests couvrant :
 - **Prédiction** : chargement du modèle, format de sortie, score, label — 7 tests (`test_predict.py`)
 - **Validation** : montants, dates, cohérence métier, types incorrects, edge cases — 30 tests (`test_validation.py`)
 - **Intégration** : chaîne complète UI → validation → prédiction, helpers, construction de l'app — 17 tests (`test_integration.py`)
@@ -88,6 +91,11 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 - **Baseline performance** : stats et construction du DataFrame du benchmark — 4 tests (`test_benchmark_baseline.py`)
 - **Inférence ONNX** : fallback sklearn, cohérence des scores sklearn vs ONNX, chargement conditionnel et cache de la session ONNX — 8 tests (`test_predict_onnx.py`)
 - **Non-régression fonctionnelle** : comparaison sklearn vs ONNX sur profils contrastés — 3 tests (`test_non_regression.py`)
+- **Logique dashboard** : calcul des KPIs (taux d'acceptation, scores, latence, taux d'erreur) et agrégation temporelle — 4 tests (`test_dashboard_logic.py`)
+
+En CI, les tests sont répartis par service :
+- `ci-gradio.yml` exécute uniquement les 7 fichiers de tests liés au scoring `app_gradio`.
+- `ci-streamlit.yml` exécute uniquement `test_dashboard_logic.py` avec couverture sur `dashboard_streamlit.logic`.
 
 ## Structure du projet
 
@@ -100,7 +108,8 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── themes.py            # Thème Navy Gold + CSS
 │   └── assets/              # Logo SVG, favicon
 ├── dashboard_streamlit/
-│   └── app.py               # Dashboard Streamlit de monitoring (lecture PostgreSQL)
+│   ├── app.py               # Dashboard Streamlit de monitoring (lecture PostgreSQL)
+│   └── logic.py             # Logique pure du dashboard (KPIs, agrégation temporelle) — testable sans Streamlit
 ├── model/
 │   ├── model_simple.joblib          # Modèle LightGBM local
 │   ├── model_simple.onnx            # Modèle converti en ONNX (inférence optionnelle via USE_ONNX=1)
@@ -136,7 +145,8 @@ poetry run pytest tests/ --cov=app_gradio --cov-report=html
 │   ├── test_scoring_service.py      # 3 tests — service de scoring
 │   ├── test_benchmark_baseline.py   # 4 tests — stats benchmark et DataFrame
 │   ├── test_predict_onnx.py         # 8 tests — intégration ONNX, fallback et coverage loader
-│   └── test_non_regression.py       # 3 tests — comparaison sklearn vs ONNX sur profils contrastés
+│   ├── test_non_regression.py       # 3 tests — comparaison sklearn vs ONNX sur profils contrastés
+│   └── test_dashboard_logic.py      # 4 tests — KPIs et agrégation temporelle du dashboard
 ├── Dockerfile.gradio         # Image Docker — scoring Gradio (embarque le modèle ONNX versionné)
 ├── Dockerfile.streamlit      # Image Docker — dashboard Streamlit
 ├── docker-compose.yml        # Lancement local des deux services

@@ -50,8 +50,17 @@ jobs:
       - name: Installation des dépendances
         run: poetry install --only main,gradio,dev
 
-      - name: Lancement des tests
-        run: poetry run pytest tests/ -v
+      - name: Tests app_gradio (scoring)
+        run: |
+          poetry run pytest \
+            tests/test_predict.py \
+            tests/test_predict_onnx.py \
+            tests/test_validation.py \
+            tests/test_integration.py \
+            tests/test_scoring_service.py \
+            tests/test_benchmark_baseline.py \
+            tests/test_non_regression.py \
+            -v
 
       - name: Vérification cohérence requirements
         run: |
