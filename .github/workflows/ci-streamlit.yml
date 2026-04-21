@@ -50,8 +50,10 @@ jobs:
       - name: Installation des dépendances
         run: poetry install --only main,gradio,streamlit,dev
 
-      - name: Lancement des tests
-        run: poetry run pytest tests/ -v
+      - name: Tests dashboard_streamlit
+        run: |
+          poetry run pytest tests/test_dashboard_logic.py \
+            --cov=dashboard_streamlit.logic --cov-report=term-missing -v
 
       - name: Vérification cohérence requirements
         run: |
