@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from dashboard_streamlit.logic import compute_kpis, prepare_daily_data
 from src.config import APP_ENV
 from src.database import (
     count_prediction_errors,
@@ -260,31 +261,19 @@ st.header("Indicateurs clés")
 
 total_predictions = count_prediction_logs()
 total_errors = count_prediction_errors()
-accepted = (df["label"] == "Crédit accordé").sum() if not df.empty else 0
-acceptance_rate = (accepted / len(df) * 100) if not df.empty else 0.0
-mean_score = df["score"].mean() if not df.empty else None
-median_score = df["score"].median() if not df.empty else None
-latency_values = df["duration_ms"].dropna() if "duration_ms" in df.columns else pd.Series(dtype=float)
-latency_mean = latency_values.mean() if not latency_values.empty else None
-latency_median = latency_values.median() if not latency_values.empty else None
-latency_max = latency_values.max() if not latency_values.empty else None
-error_rate = (
-    total_errors / (total_predictions + total_errors) * 100
-    if (total_predictions + total_errors) > 0
-    else 0.0
-)
+kpis = compute_kpis(df, total_predictions, total_errors)
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Prédictions totales", f"{total_predictions}")
-col2.metric("Taux d'acceptation", f"{acceptance_rate:.1f} %")
-col3.metric("Score moyen", _format_score(mean_score))
-col4.metric("Score médian", _format_score(median_score))
+col2.metric("Taux d'acceptation", f"{kpis['acceptance_rate']:.1f} %")
+col3.metric("Score moyen", _format_score(kpis["mean_score"]))
+col4.metric("Score médian", _format_score(kpis["median_score"]))
 
 col5, col6, col7, col8 = st.columns(4)
-col5.metric("Latence moyenne", _format_ms(latency_mean))
-col6.metric("Latence médiane", _format_ms(latency_median))
-col7.metric("Latence max", _format_ms(latency_max))
-col8.metric("Taux d'erreur", f"{error_rate:.1f} %")
+col5.metric("Latence moyenne", _format_ms(kpis["latency_mean"]))
+col6.metric("Latence médiane", _format_ms(kpis["latency_median"]))
+col7.metric("Latence max", _format_ms(kpis["latency_max"]))
+col8.metric("Taux d'erreur", f"{kpis['error_rate']:.1f} %")
 
 st.caption(
     f"Erreurs totales : {total_errors} | "
@@ -294,13 +283,7 @@ st.caption(
 # ---------------------------------------------------------------------------
 # Préparation des données temporelles
 # ---------------------------------------------------------------------------
-if not df.empty:
-    df["date"] = pd.to_datetime(df["timestamp"]).dt.date
-    daily = df.groupby("date").agg(
-        volume=("id", "count"),
-        score_moyen=("score", "mean"),
-    ).reset_index()
-    daily["date"] = pd.to_datetime(daily["date"])
+daily = prepare_daily_data(df)
 
 # ---------------------------------------------------------------------------
 # Bloc B — Évolution temporelle
